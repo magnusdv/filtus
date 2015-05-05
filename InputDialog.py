@@ -1,0 +1,532 @@
+import Tkinter
+import Pmw
+import csv
+import Filter
+import FiltusWidgets
+import FiltusUtils
+import os
+import os.path
+import operator
+import time
+import re
+import tkMessageBox
+import VariantFileReader
+
+class InputDialog(object):
+    def __init__(self, filtus):
+        self.filtus = filtus
+        self.parent = filtus.parent
+        self.reader = VariantFileReader.VariantFileReader()
+        self.currentfile = None
+        self.commentChar = '##'
+        self.sep = None
+        self.currentHeaders = []
+        self.originalHeaders = []
+        self.firstvariants = []
+        
+        self.chromCol = None
+        self.posCol = None
+        self.geneCol = None
+        self.gtCol = None
+        self.homSymbol = None
+        self.infoCol = None
+        self.formatCol = None
+        
+        self.vcf = False
+        self._INFOheaders = []
+        self._FORMATheaders = []
+        self._sampleNames = []
+        self.splitFormat = False
+        self.keep00 = False
+        self.split_general = False
+        self.splitFormatVar = Tkinter.IntVar(self.parent)
+        self.keep00Var = Tkinter.IntVar(self.parent)
+        
+        self.filter = None
+        self.skiplines = 0
+        self.prompt = True
+        self.guess = False
+        self.skipFile = False
+        self.stopLoading = False
+        self.checkHomozygosity = False
+
+        self._separators = ["comma", "tab", "semicolon", "space"]
+        self._sepDic = dict(comma=',', tab = '\t', semicolon = ';', space = ' ')
+        self._sepDicInv = {v:k for k, v in self._sepDic.items()}
+        self._createDialog()
+
+
+    def _createDialog(self):
+        self.dialog = Pmw.Dialog(self.parent, buttons = ('Use for all files', 'Use for this file', 'Skip this file', 'Cancel'),
+                            defaultbutton = 0, title = 'Input file settings', command=self._executeDialogButton,
+                            dialogchildsite_pady=10, buttonbox_pady=10)
+        self.dialog.withdraw()
+        fr = self.dialog.interior()
+        OM = FiltusWidgets.OptionMenuExt
+        filename_group = Pmw.Group(fr, tag_text = 'File name')
+        self.fileLabel = Tkinter.Label(filename_group.interior(), justify = "left", font = self.filtus.textfont)
+
+        grid_nw = dict(sticky='nw', padx=10, pady=2)
+        grid_nw_right = dict(sticky='nw', padx=(15, 10), pady=2)
+        
+        self.fileLabel.grid(row=0, column=1, **grid_nw)
+
+        basic_group = Pmw.Group(fr, tag_text = 'Basic settings')
+        basic_interior = basic_group.interior()
+        pmw_OPTIONS = dict(labelmargin=10, labelpos='w')
+        width=15 # if self.filtus.windowingsystem != 'aqua' else 12
+        OM_OPTIONS = dict(labelmargin = 10, labelpos='w', menubutton_anchor = 'w', menubutton_padx=5, menubutton_pady=1, 
+                          menubutton_width=width, menu_font=self.filtus.defaultfont)
+
+        self.sepInputOM = OM(basic_interior, label_text = "Column separator:", items = self._separators,
+                                        command=self._readAndSetHeaders, **OM_OPTIONS)
+        self.commentEntry = Pmw.EntryField(basic_interior, label_text = "Skip lines starting with:", value = self.commentChar,
+                                modifiedcommand=self._noDefButton, command=self._readAndSetHeaders, entry_width=12, **pmw_OPTIONS)
+        self.sepInputOM.grid(row=0, column=0, **grid_nw)
+        self.commentEntry.grid(row=0, column=1,  sticky='nwe', padx=(20, 12), pady=2)
+        
+        ### variant settings
+        variant_group = Pmw.Group(fr, tag_text = 'Variant settings')
+        variant_interior = variant_group.interior()
+        self.chromColMenu = OM(variant_interior, label_text = "Chrom column:", **OM_OPTIONS)
+        self.posColMenu = OM(variant_interior, label_text = "Position column:", **OM_OPTIONS)
+        self.geneColMenu = OM(variant_interior, label_text = "Gene name column:", **OM_OPTIONS)
+        
+        self.chromColMenu.grid(row=0, column=0, **grid_nw)
+        self.posColMenu.grid(row=0, column=1, **grid_nw_right)#padx=(20, 10), pady=2, sticky='nw')
+        self.geneColMenu.grid(row=1, column=0, **grid_nw)
+        
+        Tkinter.Frame(variant_interior, height=2, borderwidth=2, relief="sunken").grid(sticky='ew', pady=(8,4), columnspan=2)
+        self.vcfChooser = Pmw.RadioSelect(variant_interior, buttontype="radiobutton",
+                        labelpos="w", labelmargin=0, label_text = "Genotype format:", command=self._vcfCallback)
+        self.vcfChooser.add("VCF")
+        self.vcfChooser.add("Other")
+        self.vcfChooser.setvalue('Other')
+        self.vcfChooser.grid(sticky='w', padx=10, columnspan=2)
+        
+        self.VCFframe = Tkinter.Frame(variant_interior)
+        self.formatColMenu = OM(self.VCFframe, label_text = "FORMAT column:",  **OM_OPTIONS)
+        self.formatColMenu.grid(**grid_nw)
+        Tkinter.Checkbutton(self.VCFframe, text="Keep 0/0 (NB: only for autozygosity/de novo)", 
+            variable=self.keep00Var, anchor='w').grid(row=0, column=1, **grid_nw_right)
+            
+        self.nonVCFframe = Tkinter.Frame(variant_interior)
+        self.gtColMenu = OM(self.nonVCFframe, label_text = "Genotype column:",  **OM_OPTIONS)
+        self.homSymbolEntry = Pmw.EntryField(self.nonVCFframe, label_text = "Homozygosity symbol:", entry_width=12, **pmw_OPTIONS)
+        self.gtColMenu.grid(**grid_nw)
+        self.homSymbolEntry.grid(row=0, column=1, **grid_nw_right)
+        
+        self.VCFframe.grid(sticky='news', columnspan=2)
+        self.VCFframe.grid_remove()
+        self.nonVCFframe.grid(sticky='news', columnspan=2)
+        
+        ### split settings
+        split_group = Pmw.Group(fr, tag_text = 'Column splits')#, tag_pyclass = Button, tag_relief = 'raised', tag_command=self.vcfToggle, collapsedsize=10)
+        split_interior = split_group.interior()
+        self.splitFormatButt = Tkinter.Checkbutton(split_interior, variable=self.splitFormatVar, text="  Split FORMAT/genotypes",
+            command=self._splitFORMAT_update)
+        self.splitFormatButt.grid(sticky='w', padx=(10,5), pady=2)
+        self.infoColMenu = OM(split_interior, label_text='Split as "INFO":', command=self._splitINFO_update, **OM_OPTIONS)
+        self.infoColMenu.grid(**grid_nw)
+        
+        self.splitcol1Menu = OM(split_interior, label_text="Split column:", **OM_OPTIONS)
+        self.splitcol1_sep = Pmw.EntryField(split_interior, label_text = "by separator", entry_width=4, **pmw_OPTIONS)
+        self.splitcol2Menu = OM(split_interior, label_text="Split column:", **OM_OPTIONS)
+        self.splitcol2_sep = Pmw.EntryField(split_interior, label_text = "by separator", entry_width=4, **pmw_OPTIONS)
+        
+        self.splitcol1Menu.grid(**grid_nw)
+        self.splitcol1_sep.grid(row=2, column=1, padx=2, pady=2, sticky='nw')
+        self.splitcol2Menu.grid(**grid_nw)
+        self.splitcol2_sep.grid(row=3, column=1, padx=2, pady=2, sticky='nw')
+        
+        self.filter_group = Pmw.Group(fr, tag_text = "Filter options")
+        filter_interior = self.filter_group.interior()
+        filter_interior.columnconfigure(0, weight=1)
+        self.startupFilter = FiltusWidgets.FileBrowser(filter_interior, 
+            filtus=self.filtus, label="Apply filter file:", checkbutton=False,
+            entryfield_labelmargin=10, browsetitle="Select filter configuration file")
+        self.startupFilter.component('entryfield').configure(command=None)
+        self.startupModel = FiltusWidgets.ModelSelect(filter_interior, labelmargin=5)
+        self.closePairs = Pmw.Counter(filter_interior, label_text = "Remove variant pairs closer than (bp):", entry_width=4,
+                                    entryfield_validate = {'validator' : 'integer', 'min' : '0', 'max' : '1000'},
+                                    entryfield_value = 0, entry_justify = 'center', datatype = 'integer', **pmw_OPTIONS)
+        
+        self.startupFilter.grid(sticky='news', padx=10, pady=2)
+        self.startupModel.grid(**grid_nw)
+        self.closePairs.grid(**grid_nw)
+        for g in (filename_group, basic_group, variant_group, split_group, self.filter_group):
+            g.configure(ring_borderwidth=1, tag_font = self.filtus.smallbold)
+            g.grid(sticky='news', pady=6, padx=10, ipady=2)
+        self.align()
+
+    def _vcfCallback(self, button):
+        self.vcf = button=='VCF'
+        if self.vcf:
+            self.splitFormatButt.configure(state="normal")
+            self.splitFormatButt.select()
+            self.nonVCFframe.grid_remove()
+            self.VCFframe.grid()
+        else:
+            self.splitFormatButt.select()
+            self.splitFormatButt.configure(state="disabled")
+            self.VCFframe.grid_remove()
+            self.nonVCFframe.grid()
+        
+        
+    def align(self):
+        Pmw.alignlabels([self.sepInputOM, self.chromColMenu, self.vcfChooser, self.geneColMenu, self.formatColMenu, self.gtColMenu, 
+            self.startupFilter.component('entryfield'), self.startupModel, self.infoColMenu, self.splitcol1Menu, self.splitcol2Menu], sticky='w') 
+        Pmw.alignlabels([self.commentEntry, self.homSymbolEntry], sticky='w')
+        
+        
+    def read(self, filename, **kwargs):
+        self.skipFile = False
+        self.stopLoading = False
+        new_ext = self.currentfile is None or (os.path.splitext(filename)[1] != os.path.splitext(self.currentfile)[1])
+        self.prompt = kwargs.pop('prompt', self.prompt or new_ext)
+        self.guess = kwargs.pop('guess', self.guess or (self.prompt and new_ext))
+        
+        try:
+            self._guessAndPrepare(filename, kwargs)
+            if self.prompt or any(OM.inconsistent for OM in self._activeMenus()):
+                FiltusUtils.activateInCenter(self.parent, self.dialog)
+            else:
+                self._setParameters()
+            if self.stopLoading or self.skipFile:
+                return
+            
+            self.filtus.busy()
+            common_params = dict(filename=filename, sep=self.sep, chromCol=self.chromCol, posCol=self.posCol, #headers=self.originalHeaders, 
+                            geneCol=self.geneCol, splitAsInfo=self.infoCol, split_general=self.split_general, startupFilter=self.filter)
+            if self.vcf:
+                VF = self.reader.readVCFlike(formatCol=self.formatCol, splitFormat=self.splitFormat, keep00=self.keep00, **common_params)
+            else:
+                VF = self.reader.readNonVCF(skiplines=self.skiplines, gtCol=self.gtCol, homSymbol=self.homSymbol, **common_params)
+            self.filtus.notbusy()
+            
+        except (csv.Error, IOError) as e:
+            self.filtus.notbusy()
+            typ = type(e).__name__
+            FiltusUtils.warningMessage("I cannot read this file:\n%s\n\n%s: %s" %(filename, typ, e))
+            self.skipFile = True
+            return
+        except (ValueError, RuntimeError) as e:
+            self.filtus.notbusy()
+            FiltusUtils.warningMessage(e)
+            return self.read(filename, guess = False, prompt=True)
+        except Exception as e:
+            self.filtus.notbusy()
+            raise
+            typ = type(e).__name__
+            FiltusUtils.warningMessage("Sorry - an unknown error has occurred while reading '%s'. A bug report to magnusdv@medisin.uio.no would be appreciated\n\n%s: %s" %(filename, typ, e))
+            return self.read(filename, guess=False, prompt=True)
+            
+        if self.checkHomozygosity and VF.noHomozygotes():
+            tryagain = FiltusUtils.yesnoMessage('The file %s has no homozygous variants. Go back to settings dialog?'%filename)
+            if tryagain:
+                VF = self.read(filename, guess = False, prompt=True)
+
+        return VF
+    
+    ############# Functions to follow prepare the prompt
+        
+    def _guessAndPrepare(self, filename, kwargs):
+        self.currentfile = filename
+        self.fileLabel.configure(text=FiltusUtils.wrapFilename(filename, joinsep='\n     '))
+        headerline, firstline = self._getFirstLines(filename)
+        self.__dict__.update(kwargs)
+        sep = self.sep
+        if sep is None or sep not in headerline:
+            sep = next((char for char in ['\t', ',', ';', ' '] if char in headerline and char in firstline), '\t')
+        
+        self.sepInputOM.invoke(self._sepDicInv[sep])
+        headers = self.currentHeaders
+        
+        def _doGuess(col):
+            '''Dont guess if specified in arguments, or if the current value is consistent.'''
+            return self.guess and col not in kwargs and (getattr(self, col) is None or getattr(self, col+'Menu').inconsistent)
+        
+        lowheaders = [h.lower() for h  in headers]
+        def _matchHeader(alts):
+            for h in alts:
+                if h in lowheaders: return headers[lowheaders.index(h)]
+            return ''
+            
+        if 'chromCol' in kwargs: self.chromColMenu.setAndCheck(kwargs['chromCol'])
+        elif _doGuess('chromCol'):
+            chromCol = _matchHeader(['chrom', 'vcf_chrom', '#chrom', 'chr', 'chromosome'])
+            if chromCol: self.chromColMenu.setAndCheck(chromCol)
+        
+        if 'posCol' in kwargs: self.posColMenu.setAndCheck(kwargs['posCol'])
+        elif _doGuess('posCol'):
+            posCol = _matchHeader(['pos', 'vcf_pos', 'start', 'position', 'pos_start', 'chromosome_position'])
+            if posCol: self.posColMenu.setAndCheck(posCol)
+        
+        if 'splitAsInfo' in kwargs: 
+            self.infoColMenu.setAndCheck(kwargs['splitAsInfo'])
+            self. _splitINFO_update()
+            
+        if 'geneCol' in kwargs: self.geneColMenu.setAndCheck(kwargs['geneCol'])
+        elif _doGuess('geneCol'):
+            geneCol = _matchHeader(['gene', 'gene.refgene', 'gene symbol'])
+            if geneCol =='': 
+                genecCol = next((h for h, lowh in zip(headers, lowheaders) if 'gene' in lowh and 'name' in lowh), '')
+            if geneCol: self.geneColMenu.setAndCheck(geneCol)
+        
+        if self.guess:
+            vcf, infoCol, formatCol = self._guessVCF(self.originalHeaders, self.firstvariants[0])  # infoCol not used
+            self.vcfChooser.invoke(int(not vcf))
+            self.formatColMenu.setAndCheck(formatCol)
+        if 'formatCol' in kwargs: self.formatColMenu.setAndCheck(kwargs['formatCol'])
+        elif _doGuess('formatCol'):
+            if not vcf: formatCol = ''
+            self.formatColMenu.setAndCheck(formatCol)
+        
+        if 'splitFormat' in kwargs: 
+            self.splitFormatVar.set(kwargs['splitFormat'])
+            self._splitFORMAT_update()
+            
+        if 'keep00' in kwargs: self.keep00Var.set(kwargs['keep00'])
+        
+        if 'gtCol' in kwargs: self.gtColMenu.setAndCheck(kwargs['gtCol'])
+        elif _doGuess('gtCol'):
+            gtCol = '' if vcf else _matchHeader(['genotype', 'gt', 'zygosity', 'homozygous', 'attribute_het'])
+            self.gtColMenu.setAndCheck(gtCol)
+        
+        if 'split_general' in kwargs:
+            s = kwargs['split_general']
+            split, sep = s[0]
+            self.splitcol1Menu.setAndCheck(split)
+            self.splitcol1_sep.setvalue(sep)
+            if len(s) > 1:
+                split, sep = s[1]
+                self.splitcol2Menu.setAndCheck(split)
+                self.splitcol2_sep.setvalue(sep)
+                
+    def _getFirstLines(self, filename, n=1):
+        self.skiplines = 0
+        firstlines = []
+        self.commentChar = comment = self.commentEntry.getvalue().strip()
+        with open(filename, 'rU') as ifile:
+            for line in ifile:
+                if comment and line.startswith(comment): 
+                    self.skiplines += 1
+                    continue
+                firstlines.append(line)
+                if len(firstlines) > n: 
+                    break
+        if not firstlines or not firstlines[0].strip():
+            raise IOError("Skipping empty file: %s" %filename)
+        headerline = firstlines[0]
+        if n==1:
+            first = firstlines[1] if len(firstlines) > 1 else ''
+        else:
+            first = firstlines[1:]
+        return headerline, first
+ 
+ 
+    ################### Callback functions
+    
+    def _readAndSetHeaders(self, sepvalue=None):#, headerline=None, firstline=None):
+        '''Callback for both self.sepInputOM and self.commentEntry'''
+        headerline, firstline = self._getFirstLines(self.currentfile, n=100)
+        if sepvalue: 
+            self.sep = self._sepDic[sepvalue]
+        self.sepInputOM.setColor(test=self.sep in headerline)
+        
+        top = csv.reader([headerline] + firstline, delimiter=self.sep, skipinitialspace=True)
+        h = top.next()
+        self.firstvariants = list(top)
+        
+        if h[-1] == "Otherinfo": ### Annovar fix: Re-inserting VCF column names.
+            h[:] = self.reader._fixAnnovarOtherinfo(h, self.firstvariants[0])
+        if h[0] == '#CHROM': ### VCF tweak
+            h[0] = 'CHROM'
+        
+        self.originalHeaders = h
+        
+        self._updateColnameMenus(h, all=True)
+        self._splitINFO_update(reset=True)
+        self._splitFORMAT_update(reset=True)
+        
+        
+    def _splitINFO_update(self, column=None, reset=False): 
+        '''callback for the INFO option menu. Also called from _readAndSetHeaders (with column=None)'''
+        if reset:
+            self._INFOheaders = []
+        if column is None:
+            if self.infoColMenu.inconsistent:
+               return
+            column = self.infoColMenu.getvalue()
+            
+        self.infoColMenu.setColor(True)
+        h = self.currentHeaders[:]
+        
+        def unsplit():
+            if self._INFOheaders:
+                ind = h.index(self._INFOheaders[0])
+                h[ind:(ind + len(self._INFOheaders))] = [self.infoCol]
+            self._INFOheaders = []
+            self.infoCol = ''
+        
+        if column != "": 
+            first_infos = [v[self.originalHeaders.index(column)] for v in self.firstvariants]
+            _INFOheaders = sorted(set(s.split('=')[0] + '_INFO' for info in first_infos for s in info.split(';') if '=' in s))
+            if not _INFOheaders:
+                self.infoColMenu.setColor(False)
+                FiltusUtils.warningMessage("I don't recognise %s as an INFO column"%column)
+                return
+            unsplit() # undo possible previous split
+            ind = h.index(column)
+            h[ind:(ind + 1)] = _INFOheaders
+            self._INFOheaders = _INFOheaders
+            self.infoCol = column
+        else:
+            unsplit()
+        self._updateColnameMenus(h)    
+        
+        
+    def _splitFORMAT_update(self, reset=False): 
+        '''callback for the splitFormat checkbox'''
+        if reset:
+            self._FORMATheaders = []
+            self._sampleNames = []
+        split = self.splitFormatVar.get()
+        column = self.formatColMenu.getvalue()
+        if split and (not column or self.formatColMenu.inconsistent):
+            self.splitFormatVar.set(0)
+            return
+        
+        h = self.currentHeaders[:]
+        
+        def unsplit():
+            if self._FORMATheaders:
+                h[h.index('GT'):] = [self.formatCol] + self._sampleNames
+            self._FORMATheaders = []
+            self._sampleNames = []
+        
+        if split: 
+            first = self.firstvariants[0][self.originalHeaders.index(column)]
+            if not first.startswith('GT'):
+                self.formatColMenu.setColor(False)
+                FiltusUtils.warningMessage("FORMAT column entries must begin with 'GT'")
+                return
+            unsplit() # undo possible previous split
+            self.formatCol = column
+            self._FORMATheaders = first.split(':')
+            ind = h.index(column)
+            self._sampleNames = h[ind+1:]
+            h[ind:] = self._FORMATheaders
+        else:
+            unsplit()
+            
+        self._updateColnameMenus(h)
+        
+    def _updateColnameMenus(self, headers, all=False):
+        '''Update various option menus in the dialog. If (all) include those unaffected by splits.'''
+        self.currentHeaders = headers[:]
+        for OM in self._activeMenus(fixed=all):
+            OM.setItems([''] + headers)
+        
+    def _executeDialogButton(self, button):
+        try:
+            if button is None or button == 'Cancel':
+                self.stopLoading = True
+                self.dialog.deactivate()
+                return
+            elif button == "Skip this file":
+                self.skipFile = True
+                self.dialog.deactivate()
+                return
+            self.prompt = button != "Use for all files"  #button is either this or "Use for this file"
+            self.guess = False
+            
+            try:
+                self._setParameters()
+            except Exception as e:
+                FiltusUtils.warningMessage(e)
+                return
+        
+            self.dialog.deactivate()
+        except Exception as e:
+            FiltusUtils.warningMessage("Something went wrong. Trying to close the input dialog.")
+            self.dialog.destroy()
+            del self.filtus.fileReader
+            return
+            
+    def _setParameters(self):
+        if self.sepInputOM.inconsistent:
+            raise RuntimeError('Column separator not found in first line.\n\nPlease check the input settings (including "Skip lines starting with")')
+        wrongcols = [OM.getvalue() for OM in self._activeMenus() if OM.inconsistent and OM not in (self.splitcol1Menu, self.splitcol2Menu)]
+        if wrongcols: 
+            raise RuntimeError("Column(s) not found in file: %s" %', '.join(wrongcols))
+        for key in ['chromCol', 'posCol', 'geneCol', 'formatCol', 'gtCol', 'infoCol', 'splitcol1', 'splitcol2']:
+            setattr(self, key, getattr(self, key+'Menu').getvalue())
+        
+        self.splitFormat = self.splitFormatVar.get()
+        self.keep00 = self.keep00Var.get()
+        self.split_general = [(self.splitcol1, self.splitcol1_sep.getvalue()), (self.splitcol2, self.splitcol2_sep.getvalue())]
+        self.split_general = [(x,y) for x,y in self.split_general if x]
+        
+        if not self.chromCol: raise RuntimeError("Please indicate chromosome column.")
+        if not self.posCol: raise RuntimeError("Please indicate position column.")
+        
+        if not self.geneCol and self.startupModel.getvalue() == 'Recessive': 
+            raise RuntimeError("Gene column must be indicated when using a compound heterozygous model.")
+            
+        if self.vcf:
+            if not self.formatCol: raise RuntimeError("Please indicate vcf-like FORMAT column.")
+        else:
+            self.homSymbol = self.homSymbolEntry.getvalue()
+            if self.gtCol and not self.homSymbol: 
+                raise RuntimeError("Missing symbol for homozygous genotype.")
+            if self.homSymbol and not self.gtCol: 
+                raise RuntimeError("Symbol of homozygosity given, but no genotype column.")
+            if not self.gtCol and self.startupModel.getvalue() != 'Dominant': 
+                raise RuntimeError("Genotype column must be indicated when using recessive models.")
+        
+        for x in [x for x,y in self.split_general if not y]:
+            raise RuntimeError("Please indicate splitting separator for column '%s'." % x)
+    
+        try:
+            self.filter = self._getStartupFilter()
+        except Exception as e:
+            raise RuntimeError("Error in filter configuration file:\n\n%s"%e)
+    
+    def _getStartupFilter(self):
+        model = self.startupModel.getvalue()
+        startupFilterFile = self.startupFilter.getvalue()
+        closePairLimit = int(self.closePairs.getvalue())
+
+        if model != 'Dominant' or startupFilterFile or closePairLimit > 0:
+            filter = Filter.Filter(filterFile=startupFilterFile, model = model, closePairLimit = closePairLimit, filtus = self.filtus)
+        else:
+            filter = None
+        return filter
+
+    def _noDefButton(self):
+        '''this is invoked when modifying the commentCharEntry, to stop <Return> from jump to the default button.'''
+        self.dialog.component('buttonbox').setdefault(None)
+
+    
+    def _guessVCF(self, headers, firstvar):
+        '''Returns (vcf [T/F], infoCol, formatCol) Requires "format" in column name AND matching numbers of colons in all remaining cols'''
+        n = len(headers)
+        lowheads = [h.lower() for h in headers]
+        kolon = [x.count(':') for x in firstvar]
+        for i in range(n-1, 1, -1): # shorter to go backwards 
+            if not 'format' in lowheads[i]: continue
+            k = kolon[i]
+            if all(1 <= kolon[j] <= k or firstvar[j]=='./.' for j in range(i+1, n)):
+                infoCol = headers[i-1] if 'info' in lowheads[i-1] else ''
+                formatCol = headers[i]
+                return (True, infoCol, formatCol)
+        return (False,'','')
+
+     
+    def _activeMenus(self, fixed=True):
+        m = [self.chromColMenu, self.posColMenu, self.geneColMenu, self.gtColMenu, self.splitcol1Menu, self.splitcol2Menu]
+        if fixed: m.extend([self.infoColMenu, self.formatColMenu])
+        return m
+     
+        
