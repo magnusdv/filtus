@@ -2,7 +2,6 @@ import Tkinter
 import Pmw
 import os.path
 import math
-import operator
 import time
 import tkFileDialog
 import random
@@ -13,7 +12,6 @@ import matplotlib.collections as mplcol
 import matplotlib.transforms as mpltransforms
 
 import FiltusWidgets
-import FiltusAnalysis
 import FiltusUtils
 import FiltusDatabase
 

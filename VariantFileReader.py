@@ -92,8 +92,7 @@ class VariantFileReader(object):
                 variants = [tuple(x[:common] + [x[i]]) for x in data if not missing(x[i])]
                 h = headers[:common] + [samplename]
             VFlist.append(DataContainer.VCFtypeData(fname, h, descriptions, variants, **paramsVCF))
-            #print 'sample finished: %s'%str(time.time()-st); st=time.time()
-        
+            
         return VFlist
 
     def _getFormatHeads(self, data, formatIndex):
@@ -149,7 +148,6 @@ class VariantFileReader(object):
         return h, variants
        
     def _fixAnnovarOtherinfo(self, headers, firstvar):
-        print "FIXING OTHERINFO!!"
         lenh = len(headers)
         lenfst = len(firstvar)
         if (lenfst - lenh) == 9 and firstvar[lenh+7].startswith('GT'):
@@ -182,30 +180,11 @@ class VariantFileReader(object):
 
 
 if __name__ == "__main__":
-    import Filter
-    import FiltusAnalysis
-    autex = FiltusAnalysis.AutExComputer(genmapfile="C:\\Projects\\FILTUS\\DecodeMap_thin.txt")
-    dn = FiltusAnalysis.DeNovoComputer()
-    
     reader = VariantFileReader()
-    #testfile = "C:\\Projects\\FILTUS\\FILTUS_EXE\\example_files\\test_file.csv"
-    testfile = "C:\\Projects\\testfiles_all\\Eirik\\Frengen_PE_exome_batch5\\famPE15_PE_batch5_140206.variantsOnly.targetsPad50.ug.vqsrAndHard.SNPEFFtopImpact.vepAllAndTopImpacts.phased.vcf"
-    vflist = reader.readVCFlike(testfile, sep="\t", chromCol="CHROM", posCol="POS", geneCol="", splitAsInfo="INFO", keep00=1)
+    testfile = "example_files\\test_file.csv"
+    vflist = reader.readVCFlike(testfile, sep=",", chromCol="CHROM", posCol="POS", geneCol="Gene", splitAsInfo="INFO", keep00=1)
+    assert vflist[0].length == 425
     
-    filter = Filter.Filter(filterFile="C:\\Projects\\FILTUS\\PASSfilter.fconfig")
-    vflist = map(filter.apply, vflist)
     
-    for vf in vflist:
-        hom = autex.autex_segments(vf, f=0.01, a=0.5, error=0.005, altFreqCol='VEP_ENSEMBL_ALLELE_FREQ_INFO', defaultFreq=0.5, minlength=1.0, mincount=0)
-        print autex.summary(hom, txt=1)
     
-    #res = hom.printData(trunc=12)
-    #print res[0]
-    #print res[1]
-    #print dn.analyze(vflist[0], vflist[1], vflist[2], mut=1e-8, freq=('', 0.1)).length
-    #print dn.analyze(vflist[1], vflist[2], vflist[0], mut=1e-8, freq=('', 0.1)).length
-    #print dn.analyze(vflist[2], vflist[0], vflist[1], mut=1e-8, freq=('', 0.1)).length
-    
-    #import sys
-    #infile = sys.argv[1]
     

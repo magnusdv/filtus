@@ -1,17 +1,13 @@
-import csv
 import os.path
 import re
-import time
-import operator
 import collections
-import itertools
+from operator import itemgetter
+
 import Filter
 import FiltusUtils
-import FiltusWidgets
 
 #import memory_profiler
 #import psutil
-#TODO: In addData of variantdata: make sure gene column, variant def columns, genotype columns coincide.
 
 class ColumnData(object):
     def __init__(self, columnNames, variants, columnDescriptions=None, meta=''):
@@ -39,7 +35,7 @@ class ColumnData(object):
         if any(col not in colNames for col in columns): 
             return None
         ind = [colNames.index(col) for col in columns]
-        return operator.itemgetter(*ind)
+        return itemgetter(*ind)
         
     def addData(self, newObj): #
         for i, a, b in zip(range(3), [self.varDefColNames, self.geneCol, self.gtCol],
@@ -52,11 +48,11 @@ class ColumnData(object):
         commonheads = set([h for h in newheads if h in heads])
         
         def emptystring(x): return ''
-        old_getters = [operator.itemgetter(newheads.index(h)) if h in commonheads else emptystring for h in heads]
+        old_getters = [itemgetter(newheads.index(h)) if h in commonheads else emptystring for h in heads]
 
         newh = [h for h in newheads if not h in heads]
         if newh:
-            getNew = operator.itemgetter(*[newheads.index(h) for h in newh])
+            getNew = itemgetter(*[newheads.index(h) for h in newh])
             if len(newh) == 1:
                 newv = [tuple(getOld(v) for getOld in old_getters) + (getNew(v),) for v in newvars]
             else:

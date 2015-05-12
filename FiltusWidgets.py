@@ -5,16 +5,13 @@ import Pmw
 import os
 import os.path
 import re
-import csv
-import operator
 import gc
+from operator import itemgetter
 
-#import DataContainer
 import Filter
 import FiltusUtils
 import FiltusAnalysis
 import InputDialog
-import FiltusQC
 
 
 class PedWriter(Pmw.Dialog):
@@ -349,7 +346,7 @@ class AdvancedLoad(object):
             files = ((fil, filwpath) for fil, filwpath in files if FiltusUtils.not_contains(filwpath, exclude))
 
         files = [(fil, os.path.normpath(filpath)) for fil, filpath in files] # convert to list and fix slashes
-        return sorted(files, key=operator.itemgetter(1))
+        return sorted(files, key=itemgetter(1))
 
     def doCommand(self, result):
         self.dialog.deactivate()
@@ -1702,7 +1699,7 @@ class RegionFile(FileBrowser):
             with open(string, 'rU') as regions:
                 regs = [line.split() for line in regions if not line.startswith('##')]
             if all(x in regs[0] for x in ('CHR', 'POS1', 'POS2')): # reading plink .hom files!
-                get3 = operator.itemgetter(regs[0].index('CHR'), regs[0].index('POS1'), regs[0].index('POS2'))
+                get3 = itemgetter(regs[0].index('CHR'), regs[0].index('POS1'), regs[0].index('POS2'))
                 regs = [get3(r) for r in regs]
             else:
                 regs = [r[:3] for r in regs]

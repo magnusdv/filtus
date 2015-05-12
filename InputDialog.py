@@ -4,12 +4,8 @@ import csv
 import Filter
 import FiltusWidgets
 import FiltusUtils
-import os
+
 import os.path
-import operator
-import time
-import re
-import tkMessageBox
 import VariantFileReader
 
 class InputDialog(object):

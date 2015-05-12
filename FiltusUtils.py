@@ -1,8 +1,5 @@
 import re
-import itertools
 import bisect  
-import collections
-import FiltusAnalysis
 import tkMessageBox
 import datetime
 

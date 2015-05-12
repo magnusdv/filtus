@@ -1,23 +1,18 @@
-import Tkinter
-import Pmw
-import Filter
-import FiltusUtils
-import FiltusWidgets
-import DataContainer
-import AutEx
-import os
+import os.path
 import csv
-import operator
 import collections
 import itertools
-import random
 import re
 import math
-import time
-import testJacq
-#import FiltusQC
-
+from operator import itemgetter
 from subprocess import call
+
+import Pmw
+
+import Filter
+import FiltusUtils
+import DataContainer
+import AutEx
 
 def geneLookup(genes, VFlist):
     if all(VF.geneGetter is None for VF in VFlist):
@@ -151,7 +146,7 @@ class GeneticMap(object):
                 header = mapfil.next()
                 mapMatrix = [map(conv, line.split('\t')) for line in mapfil]
             
-            chromGroups = itertools.groupby(mapMatrix, key=operator.itemgetter(0))
+            chromGroups = itertools.groupby(mapMatrix, key=itemgetter(0))
             self.chromMaps = {chromInt(chr) : zip(*chrmap)[1:] for chr, chrmap in chromGroups}
     
     def phys2cm(self, chr, phys):
@@ -263,91 +258,7 @@ class AlleleFreq(object):
         elif len(ref)<len(obs):
             return 1 - maf if allele=='-' else maf
         
-
-def pairwiseNaive(VFlist):
-    n = len(VFlist)
-    uniques = [VF.getUniqueVariants() for VF in VFlist]
-    
-    # Variant sharing matrix
-    matr1 = []
-    for i in range(n):
-        matr1.append(['']*i + [len(set.intersection(uniques[i], uniques[j])) for j in range(i, n)])
-    
-    # Variant sharing in percentages. (Row x, column y) = % of variants in x also present in y.
-    matr1f = [[float(x) if x!='' else 0.0 for x in row] for row in matr1]
-    matr2 = []
-    for i in range(n):
-        diag = matr1f[i][i]
-        if diag != 0:
-            matr2.append([matr1f[j][i]/diag * 100 for j in range(i)] + ['-'] + [matr1f[i][j]/diag * 100 for j in range(i + 1, n)])
-        else:
-            matr2.append(['-']*n)
-    return matr1, matr2
-    
-def pairIBS(VF1, VF2, altFreqCol=None, MAFcolumns=None, altFreqMin=0, altFreqMax=1, verbose=True, utfil=None):  # IBS count
-    if verbose: print >> utfil, 'Relatedness estimation: %s vs. %s' %(VF1.shortName, VF2.shortName)
-    
-    vardef1, vardef2 = VF1.varDefGetter, VF2.varDefGetter
-    gt1, gt2 = VF1.GTnum(), VF2.GTnum()
-    freq1 = AlleleFreq(VF1, defaultFreq=-1, altFreqCol=altFreqCol, MAFcolumns=MAFcolumns)
-    freq2 = AlleleFreq(VF2, defaultFreq=-1, altFreqCol=altFreqCol, MAFcolumns=MAFcolumns)
-    st = time.time()
-    
-    data = {vardef1(v) : [gt1(v), 0, freq1(v)] for v in VF1.variants if not freq1(v)<0}
-    for v in VF2.variants:
-        vdef = vardef2(v)
-        if vdef in data:
-            data[vdef][1] = gt2(v)
-        else:
-            fr = freq2(v)
-            if not fr<0:
-                data[vdef] = [0, gt2(v), fr]
-    
-    ibs_210 = [0,0,0]
-    freqs = []
-    for dat in data.itervalues():
-        if dat[0]==dat[1]==0: continue
-        fr = dat[2]
-        if not altFreqMin<fr<altFreqMax: continue
-        ibs_210[abs(dat[1]-dat[0])] += 1
-        freqs.append(fr)
-    N = len(freqs)
-    if verbose: print >> utfil, 'Reduced to %d non-AA/AA markers' %N
-    
-    ibs = [float(ibs_210[j])/N for j in (2,1,0)]
-    if verbose: print >> utfil, 'IBS sample distribution: (ibs0, ibs1, ibs2) = (%.3f  %.3f  %.3f)' % tuple(ibs)
-    exact = testJacq.exactIBS(freqs, remove_AA_AA=True)
-    
-    error = {rel : sum((ibsi-exi)**2 for ibsi, exi in zip(ibs, ex)) for rel, ex in exact.iteritems()}
-    summary = 'Expected distributions (SQE) under these allele frequencies:\n' + '\n'.join('%-8s %.3f  %.3f  %.3f  (%.4f)' %(r, x[0], x[1], x[2], error[r]) for r,x in sorted(exact.iteritems()))
-    if verbose: print >> utfil, summary
-    closest = min((d, rel) for rel,d in error.iteritems())[1]
-    if verbose: print >> utfil, 'Estimated relation with freqs %.2f-%.2f: %s\n' %(altFreqMin, altFreqMax, closest)
-    return closest
- 
-        
-def pairwiseIBS(VFlist):  # IBS matrix. NOT USED!
-    n = len(VFlist)
-    shortnames = [VF.shortName for VF in VFlist]
-    uniq0 = [VF.getUniqueVariants(alleles=0) for VF in VFlist]
-    uniq1 = [VF.getUniqueVariants(alleles=1) for VF in VFlist]
-    uniq2 = [VF.getUniqueVariants(alleles=2) for VF in VFlist]
-    inters = set.intersection
-    res = []
-    for i in range(n-1):
-        for j in range(i+1,n):
-            if j==i: continue
-            ibs0 = len(inters(uniq0[i], uniq2[j])) + len(inters(uniq2[i], uniq0[j]))
-            ibs1 = len(inters(uniq0[i], uniq1[j])) + len(inters(uniq1[i], uniq0[j])) + \
-                   len(inters(uniq1[i], uniq2[j])) + len(inters(uniq2[i], uniq1[j]))
-            ibs2 = len(inters(uniq0[i], uniq0[j])) + len(inters(uniq1[i], uniq1[j])) + len(inters(uniq2[i], uniq2[j]))
-            tot = ibs0 + ibs1 + ibs2
-            ibs0p, ibs1p, ibs2p = 100.0*ibs0/tot, 100.0*ibs1/tot, 100.0*ibs2/tot
-            res.append([shortnames[i], shortnames[j], ibs0, ibs1, ibs2, tot, ibs0p, ibs1p, ibs2p])
-            
-    x = DataContainer.ColumnData(variants=res, columnNames=('Sample1', 'Sample2', 'IBS0', 'IBS1', 'IBS2', 'TOT', 'IBS0%', 'IBS1%', 'IBS2%'))
-    return x
-                   
+  
 def pairwiseSharing(seleci, filtus):
     n = len(seleci)
     VFlist = [filtus.filteredFiles[i] for i in seleci]
@@ -719,6 +630,7 @@ class DeNovoComputer(object):
 
     
 class NgTable(object):
+    #TODO: This needs cleaning up. Move GUI stuff out of here.
     def __init__(self, sharingPage, count_what): #if what = 'genes': count genes. If what = 'variants', count variants
         self.sharingPage = sharingPage
         self.filtus = sharingPage.filtus
@@ -889,7 +801,7 @@ class PlinkComputer(object):
         
         with open(outprefix+'.hom', "rU") as homfile:
             heads = [h.strip() for h in homfile.next().split(' ') if h]
-            goodcols = operator.itemgetter(*[heads.index(H) for H in heads if H not in ['FID', 'PHE', 'SNP1', 'SNP2']])
+            goodcols = itemgetter(*[heads.index(H) for H in heads if H not in ['FID', 'PHE', 'SNP1', 'SNP2']])
             heads = goodcols(heads)
             homReader = csv.reader(homfile, delimiter = ' ', skipinitialspace=True)
             homlist = [tuple(goodcols(line)) for line in homReader]
@@ -926,30 +838,8 @@ class PlinkComputer(object):
             fraction = totMB/3000.0
         result = {"Segments":n, "Fraction":fraction, "Total (MB)":totMB,"Longest (MB)":maxMB, }
         return result
-       
-def saveAsPedOLD(VFlist, dir, prefix="filtus2plink"):
-        if not all(VF.chromGetter and VF.posGetter and VF.gtCol for VF in VFlist):
-            raise KeyError("Unknown chromosome/position/genotype column for some of the selected samples")
-        
-        all_sorted = sorted(set.union(*[VF.allChromPos() for VF in VFlist]))
-        if len(all_sorted) == 0:
-            raise IndexError("The selected samples contain no variants")
-        
-        pedpath = os.path.abspath(os.path.join(dir, prefix + '.ped'))
-        mappath = os.path.abspath(os.path.join(dir, prefix + '.map'))
 
-        with open(pedfilename, 'w') as pedfile:
-            for i, VF in enumerate(VFlist):
-                pedfile.write('1 %d 0 0 1 1 ' %(i+1,))
-                pedfile.write(' '.join(str(x) for x in VF.pedrow(total_set_sorted=all_sorted)))
-                pedfile.write('\n')
-
-        with open(mapfilename, 'w') as mapfile:
-            # format (X, var10, 0, 1234567) standard plink. Could have used merlin format, but require extra parameters.
-            mapfile.write('\n'.join('%s\tvar%d\t0\t%d' %(str(chrom), i + 1, pos) for i, (chrom, pos) in enumerate(all_sorted)))
         
-        return [pedfilename, mapfilename]
-         
 class AutExComputer(object):
     def __init__(self, genmapfile):
         self.genmap = GeneticMap(mapfilename=genmapfile)
@@ -984,7 +874,6 @@ class AutExComputer(object):
     def autex_segments(self, VF, f, a, error, defaultFreq, altFreqCol=None, MAFcolumns=None, threshold=0.5, minlength=0.0, unit='cM*', mincount=0, overrule_count=100):
         chr, pos, gtnum = VF.chromGetter, VF.posGetter, VF.GTnum()
         freq = AlleleFreq(VF, defaultFreq=defaultFreq, altFreqCol=altFreqCol, MAFcolumns=MAFcolumns, minmax=(0.01, 0.99))
-        st = time.time()
         sortedVariants = sorted(VF.variants, key=VF.chromGetter)
         chromGroups = itertools.groupby(sortedVariants, key=chr)
         segments = []
@@ -1059,52 +948,15 @@ if __name__ == "__main__":
     import VariantFileReader
     reader = VariantFileReader.VariantFileReader()
 
-    vcftest = "Testfiles\\vcf_example2.vcf"
+    vcftest = "C:\\Projects\\FILTUS\\Testfiles\\vcf_example2.vcf"
     vflist = reader.readVCFlike(vcftest, sep="\t", chromCol="CHROM", posCol="POS", geneCol="Gene_INFO", splitAsInfo="INFO", keep00=1)
     vf = vflist[0]
     print vf.length 
-    '''
-    #af = AlleleFreq(vf, defaultFreq=0.5555, MAFcolumns=("ALT", "FRQ_INFO", "REF", "ALT"), minmax=(0.01,.99))
-    #for v in vf.variants: print af(v)
     
-    ef3 = "C:\\Projects\\testfiles_all\\Eirik\\Frengen_PE_exome_batch3\\famPE37_PE_batch3.variantsOnly.targetsPad50.ug.vqsrAndHard.SNPEFFtopImpact.vepAllAndTopImpacts.dbNSFP.vcf"
-    vf3 = reader.readVCFlike(ef3, sep="\t", chromCol="CHROM", posCol="POS", geneCol="", splitAsInfo="INFO", keep00=1)[0]
-    id3 = vf3.columnGetter("ID")
-    ef4 = "C:\\Projects\\testfiles_all\Eirik\\Frengen_PE_exome_batch4\\famPE1_PE_batch4_140109_187.variantsOnly.targetsPad50.ug.vqsrAndHard.SNPEFFtopImpact.vepAllAndTopImpacts.vcf"
-    vf4 = reader.readVCFlike(ef4, sep="\t", chromCol="CHROM", posCol="POS", geneCol="", splitAsInfo="INFO", keep00=1)[0]
-    id4 = vf4.columnGetter("ID")
-    
-    print vf3.length, vf4.length
-    x3 = {id3(v):v for v in vf3.variants[:2000] if id3(v)}
-    x4 = {id4(v):v for v in vf4.variants[:2000] if id4(v) and id4(v) in x3}
-    rslist = list(x4)
-    
-    AF3 = AlleleFreq(vf3, defaultFreq=0.5555, MAFcolumns=("VEP_GMAF_INFO", "REF", "ALT"))
-    AF4 = AlleleFreq(vf4, defaultFreq=0.5555, altFreqCol="VEP_ENSEMBL_ALLELE_FREQ_INFO")
-    AF42 = AlleleFreq(vf4, defaultFreq=0.5555, MAFcolumns=("VEP_ENSEMBL_GLOBAL_MINOR_ALLELE_INFO","VEP_ENSEMBL_GLOBAL_MINOR_ALLELE_FREQ_INFO", "REF", "ALT"), minmax=(0.01,.99))
-    
-    g = vf3.columnGetter("VEP_GMAF_INFO", "REF", "ALT")
-    dat4 = vf4.columnGetter("VEP_ENSEMBL_GLOBAL_MINOR_ALLELE_INFO","VEP_ENSEMBL_GLOBAL_MINOR_ALLELE_FREQ_INFO", "REF", "ALT")
-    dat3 = vf3.columnGetter("VEP_GMAF_INFO", "REF", "ALT")
-    
-    for rs in rslist:
-        if abs(AF3(x3[rs]) - AF4(x4[rs])) > 0.05:
-            print AF3(x3[rs]), AF4(x4[rs]), dat3(x3[rs])
-        if abs(AF42(x4[rs]) - AF4(x4[rs])) > 0.05:
-            print AF42(x4[rs]), AF4(x4[rs]), dat4(x4[rs])
-    
-    '''
     gs = GeneSharingComputer(None)
     share = gs.analyze(vflist[:2], vflist[2:], model="Dominant", family=False, VFcases_index=(0,1), minSampleCount=1)
     _printVF(share)
     share_var = share.variantsInGenes(genes=None).collapse()
     _printVF(share_var)
     share_var.save("kast2.txt")
-    # test saveAsPed2
-    #saveAsPed2(vflist, pedigree='1 1 0 0 1 1\n1 2 0 0 2 1\n1 3 1 2 1 2\n', sampleIndex=[0,1,2], merlin=1, genmapfile=None, freqColumn='FRQ_INFO', defaultFreq=0.1, dir='.', prefix='testrun', freqBuffer=0.01)
-    
-    # test denovo:
-    #dn = DeNovoComputer()
-    #res = dn.analyze(VFch=vflist[0], VFfa=vflist[1], VFmo=vflist[2], mut=1e-8, altFreqCol="FRQ_INFO", defaultFreq=0.1)
-    #_printVF(res)
     

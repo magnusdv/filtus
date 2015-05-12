@@ -16,9 +16,9 @@ import FiltusWidgets
 import FiltusDatabase
 import FiltusAnalysis
 import FiltusUtils
-#import DataContainer
 import InputDialog
 
+# module FiltusQC is imported in a special method - to check availability of numpy and matplotlib.
 try:
     import FiltusQC
     PLOT_error = None
@@ -26,9 +26,6 @@ except ImportError as e:
     print 'plot import error'
     PLOT_error = e
  
-# module FiltusQC is imported in a special method - to check availability of numpy and matplotlib.
-# import autorun
-
 class Filtus(object):
     def __init__(self, parent, version):
         self.parent = parent
@@ -225,8 +222,6 @@ class Filtus(object):
         menuBar.addmenuitem('Analysis', 'separator')
         menuBar.addmenuitem('Analysis', 'command', None, command=self.pairwiseSharing, label='Pairwise variant sharing', font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'separator')
-        #menuBar.addmenuitem('Analysis', 'command', None, command=self.resampling_prompt, label='Resampling test', font=self.defaultfont)
-        #menuBar.addmenuitem('Analysis', 'separator')
         menuBar.addmenuitem('Analysis', 'command', None, command=self.QC_prompt, label='QC plots', font=self.defaultfont) 
         if PLOT_error:
             menuBar.component('Analysis-menu').entryconfigure('end', state='disabled')
@@ -290,7 +285,6 @@ class Filtus(object):
             FiltusUtils.warningMessage(e)
             return False
         
-        
     def autozyg_prompt(self):
         if not self.checkLoadedSamples(select="selection", VF=False, minimum=1, maximum=1):
             return
@@ -342,7 +336,6 @@ class Filtus(object):
             print "Killing myself because of: %s"%e
             self.parent.destroy()
     
-    
     def geneLookup_prompt(self):
         if not self.checkLoadedSamples(select="all"):
             return
@@ -365,25 +358,10 @@ class Filtus(object):
             self.genelengths = FiltusWidgets.GeneLengthFile(self)
         self.genelengths.browse()
 
-    # def resampling_prompt(self):
-        # if len(self.filteredFiles) == 0:
-            # FiltusUtils.warningMessage("No samples are loaded")
-            # return
-        # if not hasattr(self, 'resamplingDialog'):
-            # self.resamplingDialog = FiltusWidgets.ResamplingDialog(self)
-        # self.resamplingDialog.showDialog()
-
     def find_genmapfile(self): # Find and parse file with recombination map
         decodeFile = "DecodeMap_thin.txt"
-        decode_trypaths = [os.path.join(direc, decodeFile) for direc in [os.path.join("..","example_files", "../example_files"), ""]]
+        decode_trypaths = [os.path.join(direc, decodeFile) for direc in ("..", "example_files", "../example_files")]
         return next((p for p in decode_trypaths if os.path.isfile(p)), None)
-        #return if _decodeUse is None:
-        #    FiltusUtils.warningMessage("Looking for 'DecodeMap_thin.txt' in the example_files folder...\nFile not found.\n\nUsing uniform map with 1 Mb = 1 cM.") 
-        #try:
-        #    self.genmap = FiltusAnalysis.GeneticMap(mapfilename=_decodeUse)
-        #except Exception as e:
-        #    FiltusUtils.warningMessage("Could not read genetic map file: %s.\n%s: %s\n\nUsing uniform map with 1 Mb = 1 cM." % (_decodeUse, type(e).__name__, e))
-        #    self.genmap = FiltusAnalysis.GeneticMap(mapfilename=None)
         
     def mergeCommand(self, collapse):
         def _m():
@@ -615,35 +593,36 @@ if v[:2] != (2,7):
 
 root = Tk()
 Pmw.initialise(root)
-filtus = Filtus(root, version="0.99-92")
+filtus = Filtus(root, version="0.99-93")
 root.title("FILTUS " + filtus.version)
 
 if __name__ == "__main__":
     
     printVF = FiltusAnalysis._printVF
+    test_csv = ["C:\\Projects\\FILTUS\\Testfiles\\test%d.csv" %i for i in (1,2)]
+    test_vcf = "C:\\Projects\\FILTUS\\Testfiles\\vcf_example.vcf"
+    triotest = "C:\\Projects\\FILTUS\\Testfiles\\triotest.txt" 
     
     def test_loading():
-        filtus.loadFiles(["Testfiles\\test1.csv"], guess=1, prompt=0, geneCol="")
-        return
+        filtus.clearAll()
+        filtus.loadFiles([test_csv[0]], guess=1, prompt=0, geneCol="")
         assert len(filtus.files) == 1
         filtus.toggleShortNames()
         assert len(filtus.files) == 1
         filtus.clearAll()
-        filtus.loadFiles(["Testfiles\\test1.csv", "Testfiles\\test2.csv"], guess=1, prompt=0, geneCol="")
+        filtus.loadFiles(test_csv, guess=1, prompt=0, geneCol="")
         assert len(filtus.files) == 2
         filtus.toggleShortNames()
         assert len(filtus.files) == 2
         filtus.clearAll()
-        filtus.loadFiles(["Testfiles\\vcf_example.vcf"], guess=1, prompt=0, geneCol="")
+        filtus.loadFiles([test_vcf], guess=1, prompt=0, geneCol="")
         assert len(filtus.files) == 3
         filtus.toggleShortNames()
         assert len(filtus.files) == 3
-        filtus.clearAll()
-        
-        
         
     def test_sharing():
-        filtus.loadFiles(["Testfiles\\test1.csv", "Testfiles\\test2.csv"], guess=1, prompt=0, splitAsInfo="INFO")
+        filtus.clearAll()
+        filtus.loadFiles(test_csv, guess=1, prompt=0, geneCol="Gene", splitAsInfo="INFO")
         gs, vs = filtus.gs, filtus.vs
         gs.cases.setvalue('1,2')
         gs.button.invoke()
@@ -651,7 +630,8 @@ if __name__ == "__main__":
         vs.button.invoke()
     
     def test_denovo():
-        filtus.loadFiles(["Testfiles\\triotest.txt"], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
+        filtus.clearAll()
+        filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
         dn = filtus.dn
         dn.focus()
         dn.child.setvalue('ID CH')
@@ -664,28 +644,32 @@ if __name__ == "__main__":
         res1 = filtus.text.currentColDat
         ch, fa, mo = filtus.files
         res2 = dn2.analyze(VFch=ch, VFfa=fa, VFmo=mo, trioID=[0,1,2], mut=1e-8, defaultFreq=0.1, altFreqCol='1000g2012apr_all')
-        print res1.length == res2.length and all(a[0]==b[0] for a,b in zip(res1.variants, res2.variants))
+        assert res1.length == res2.length
+        assert all(a[0]==b[0] for a,b in zip(res1.variants, res2.variants))
     
     def test_autex():
-        filtus.loadFiles(["Testfiles\\triotest.txt"], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
+        filtus.clearAll()
+        filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
         filtus.fileListbox.selection_set(0)
         filtus.autexgui = FiltusWidgets.AutEx_GUI(filtus)
         filtus.autexgui._prepare()
         altfreq, deffreq, thresh, length, unit, n = '1000g2012apr_all', 0.05, 0.1, 0.1, 'Mb', 20
         for w, val in zip(('_altFreqMenu', '_def_freq_entry', '_thresh_entry', '_minlength_entry', '_unitmenu', '_mincount_entry'), (altfreq, deffreq, thresh, length, unit, n)):
             getattr(filtus.autexgui, w).setvalue(str(val))
+        
         filtus.autexgui.execute("Compute")
         res1 = filtus.text.currentColDat
         
         autex = FiltusAnalysis.AutExComputer(genmapfile="C:\\Projects\\FILTUS\\DecodeMap_thin.txt")
         res2 = autex.autex_segments(filtus.files[0], f=0.01, a=.5, error=0.005, defaultFreq=deffreq, altFreqCol=altfreq, threshold=thresh, minlength=length, unit=unit, mincount=n)
         
-        #printVF(res1); printVF(res2)
-        print res1.length == res2.length and all(a[1]==b[1] for a,b in zip(res1.variants, res2.variants))
+        assert res1.length == res2.length
+        assert all(a[1]==b[1] for a,b in zip(res1.variants, res2.variants))
         filtus.autozyg_prompt()
         
     def test_qc():
-        filtus.loadFiles(["Testfiles\\triotest.txt"], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
+        filtus.clearAll()
+        filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
         QC = FiltusQC.QC(filtus)
         QC._prepare()
         QC.save_browser.setvalue("C:\\Projects\\FILTUS\\kast.txt")
@@ -695,30 +679,33 @@ if __name__ == "__main__":
         QC.histo_var.setvalue("caddgt10")
         QC._executeDialogButton("Ok")
         QC._scatterButtonExecute()
-        QC._histoButtonExecute()
+        QC._histogramButtonExecute()
         filtus.QC = QC
         filtus.QC_prompt()
         
     def test_summary():
-        filtus.loadFiles(["Testfiles\\test1.csv", "Testfiles\\test2.csv"], guess=1, prompt=0, splitAsInfo="INFO")
+        filtus.clearAll()
+        filtus.loadFiles(test_csv, guess=1, prompt=0, splitAsInfo="INFO")
         summarymenu = filtus.menuBar.component('columnsum-menu')
         summarymenu.invoke(0)
     
     def test_geneloopkup():
-        filtus.loadFiles(["Testfiles\\test1.csv", "Testfiles\\test2.csv"], guess=1, prompt=0, splitAsInfo="INFO")
+        filtus.clearAll()
+        filtus.loadFiles(test_csv, guess=1, prompt=0, splitAsInfo="INFO")
         summarymenu = filtus.menuBar.component('columnsum-menu')
         summarymenu.invoke(0)
     
     def test_advancedload():
+        filtus.clearAll()
         filtus.advLoad = FiltusWidgets.AdvancedLoad(filtus)
-        print os.path.isdir("C:\\Projects\\FILTUS\\Testfiles\\")
         filtus.advLoad.dirEntry.setvalue("C:\\Projects\\FILTUS\\Testfiles\\")
         filtus.advLoad.endswithEntry.setvalue(".vcf")
         filtus.advLoad.endswithVar.set(1)
         filtus.advLoad_prompt()
     
     def test_plink():
-        filtus.loadFiles(["Testfiles\\triotest.txt"], guess=1, prompt=0, keep00=1, splitAsInfo="")
+        filtus.clearAll()
+        filtus.loadFiles([triotest], guess=1, prompt=0, keep00=1, splitAsInfo="")
         filtus.fileListbox.selection_set(0)
         filtus.plinkgui = FiltusWidgets.PLINK_GUI(filtus)
         filtus.plinkgui._prepare()
@@ -727,13 +714,14 @@ if __name__ == "__main__":
     
     if len(sys.argv) > 1:
         test_loading()
-        #test_plink()
-        #test_summary()
-        #test_sharing()
-        #test_denovo()
-        #test_qc()
-        #test_autex()
-        #test_advancedload()
+        test_advancedload()
+        test_summary()
+        test_sharing()
+        test_qc()
+        test_denovo()
+        test_plink()
+        test_autex()
+        print 'all tests passed'
         
 root.mainloop()
 

@@ -1,10 +1,9 @@
 import FiltusUtils
 import FiltusWidgets
 import VariantFileReader
-import csv
 import itertools
 import collections
-import operator
+from operator import itemgetter
 
 class Filter(object):
     def __init__(self,
@@ -255,7 +254,7 @@ class Filter(object):
         if columnfilters:
             for col, op, entry, keep in columnfilters:
                 if col in headers:
-                    getcol = operator.itemgetter(headers.index(col))
+                    getcol = itemgetter(headers.index(col))
                     res[:] = [v for v in res if op(getcol(v), entry)]
                 elif keep: continue
                 # else: This is dealt with in checks()

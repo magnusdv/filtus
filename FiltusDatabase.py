@@ -1,20 +1,16 @@
+import os.path
+import time
+import tkFileDialog
+import collections
+import itertools
+from operator import itemgetter
+
 import Tkinter
 import Pmw
 import FiltusUtils
 import FiltusWidgets
 import Filter
-import os.path
 import DataContainer
-import time
-import tkFileDialog
-# import csv
-import operator
-import collections
-import itertools
-# import random
-# import re
-# import math
-# from subprocess import call
 
 def _readTop(file):
     '''
@@ -739,7 +735,7 @@ class VariantDatabase(DataContainer.ColumnData):
             meta, colNames, dbfil = _readTop(dbfil)
             
             OBS_ind = colNames.index('OBS')
-            v_extractor = operator.itemgetter(*range(OBS_ind))
+            v_extractor = itemgetter(*range(OBS_ind))
             
             sample_ind = OBS_ind + 4
             N = inNS + N_add
@@ -792,8 +788,8 @@ class VariantDatabase(DataContainer.ColumnData):
             meta, colNames, dbfil = _readTop(dbfil)
             
             OBS_ind = colNames.index('OBS')
-            v_extractor = operator.itemgetter(*range(OBS_ind))
-            gt_extractor = operator.itemgetter(*[s + OBS_ind + 4 for s in subset])
+            v_extractor = itemgetter(*range(OBS_ind))
+            gt_extractor = itemgetter(*[s + OBS_ind + 4 for s in subset])
             
             for line in dbfil:
                 dat = line.strip().split('\t')
@@ -807,7 +803,7 @@ class VariantDatabase(DataContainer.ColumnData):
         
     def addSimple(self, other, meta):
         '''Adds a simple database to this (simple) database. Returns a new database.'''
-        vdef = operator.itemgetter(0,1)
+        vdef = itemgetter(0,1)
         dic = {vdef(v) : map(int, v[3:5]) for v in self.variants}
         for v in other.variants:    
             vv = vdef(v)
@@ -936,7 +932,7 @@ if __name__=='__main__':
     import VariantFileReader
     reader = VariantFileReader.VariantFileReader()
 
-    vcftest = "Testfiles\\vcf_example2.vcf"
+    vcftest = "C:\\Projects\\FILTUS\\Testfiles\\vcf_example2.vcf"
     VFlist = reader.readVCFlike(vcftest, sep="\t", chromCol="CHROM", posCol="POS", geneCol="Gene_INFO", splitAsInfo="INFO", keep00=0)
     dbe = VariantDatabase.buildFromSamples(VFlist, "Ex")
     dbe.save("kast.txt")
