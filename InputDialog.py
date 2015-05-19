@@ -159,11 +159,11 @@ class InputDialog(object):
         self.vcf = button=='VCF'
         if self.vcf:
             self.splitFormatButt.configure(state="normal")
-            self.splitFormatButt.select()
             self.nonVCFframe.grid_remove()
             self.VCFframe.grid()
         else:
-            self.splitFormatButt.select()
+            self.splitFormatButt.deselect()
+            self._splitFORMAT_update()
             self.splitFormatButt.configure(state="disabled")
             self.VCFframe.grid_remove()
             self.nonVCFframe.grid()
@@ -272,15 +272,17 @@ class InputDialog(object):
         if self.guess:
             vcf, infoCol, formatCol = self._guessVCF(self.originalHeaders, self.firstvariants[0])  # infoCol not used
             self.vcfChooser.invoke(int(not vcf))
-            self.formatColMenu.setAndCheck(formatCol)
-        if 'formatCol' in kwargs: self.formatColMenu.setAndCheck(kwargs['formatCol'])
-        elif _doGuess('formatCol'):
-            if not vcf: formatCol = ''
+            if vcf: self.splitFormatVar.set(1) # Default option: Split FORMAT
+            
+        if 'formatCol' in kwargs: 
+            self.formatColMenu.setAndCheck(kwargs['formatCol'])
+        elif self.guess: #from above
             self.formatColMenu.setAndCheck(formatCol)
         
         if 'splitFormat' in kwargs: 
             self.splitFormatVar.set(kwargs['splitFormat'])
-            self._splitFORMAT_update()
+            
+        self._splitFORMAT_update()
             
         if 'keep00' in kwargs: self.keep00Var.set(kwargs['keep00'])
         

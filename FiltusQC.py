@@ -244,7 +244,7 @@ def histogramPlot(VFlist, column, bins, NA_vals = ('', 'NA', '.', '-'), save=Non
 def homPlot(pos, obs, scores, freqs, title='', segs=None, save=None, show=True):
     fig = plt.figure(figsize=(14, 6))
     ax = fig.add_subplot(1, 1, 0)
-    obs_jit = [0.2*fr + 0.4*gt + random.random()/50 for gt,fr in zip(obs, freqs)]
+    obs_jit = [0.4*gt + 0.18*fr + random.random()*0.02 for gt,fr in zip(obs, freqs)]
     ax.plot(pos, obs_jit, 'bo')
     ax.plot(pos, scores, 'r-')
     ax.add_collection(mplcol.BrokenBarHCollection([(s[0], s[2]*1.0e6) for s in segs], (0,1), facecolor='green', alpha=0.2))
@@ -308,14 +308,16 @@ def QC_3plots(VFlist, gender=True, private=True, heterozygosity=True, writetofil
         plotnr += 1
         ax_sex = fig.add_subplot(nrow, ncol, plotnr, aspect=1)
         XminusPAR = FiltusUtils.XminusPAR
-        db_X = zip(*[x[6:] for x in db_str if XminusPAR(x[:2])])
-        if db_X: 
+        db_X_raw = [x[6:] for x in db_str if XminusPAR(x[:2])]
+        if db_X_raw:
+            db_X = zip(*db_X_raw)
             totals_X = [sum(map(bool, x)) for x in db_X]
             hets = [sum(g == 1 for g in sample)*100.0/tot if tot>0 else 0 for sample, tot in zip(db_X, totals_X)]
             for i in range(N): 
                 ax_sex.plot(totals_X[i], hets[i], marker=markers[i], color=cols[i], markersize=sizes[i])
         else:
-            print "Empty gender estimation plot.\n\nNo variants found on X \ PAR."
+            totals_X, hets = [0]*N, [0]*N
+            #print "Empty gender estimation plot.\n\nNo variants found on X \ PAR."
         
         setPlotParams(ax_sex, "Gender estimation", 'Variants on X (-PAR)', 'Heterozygosity (%)', ylim=(0,100))
         ax_sex.axhspan(0, 15, facecolor='blue', alpha=0.2)
@@ -331,7 +333,7 @@ def QC_3plots(VFlist, gender=True, private=True, heterozygosity=True, writetofil
             headers = sep.join(['Sample', 'Variants on X (-PAR)', 'Heterozygosity (%)', 'Gender'])
             genders = ['?' if tot==0 or 15<h<35 else 'Male' if h<=15 else 'Female' for tot, h in zip(totals_X, hets)]
             points = [sep.join([s, str(x), '%.2f'%y, g]) for s,x,y,g in zip(DB.sampleNames, totals_X, hets, genders)]
-            text_out += "#Plot: Gender estimation\n" + headers + '\n' + '\n'.join(points) + '\n'
+            text_out += "***Plot: Gender estimation***\n" + headers + '\n' + '\n'.join(points) + '\n\n'
        
     if private:
         plotnr += 1
@@ -354,7 +356,7 @@ def QC_3plots(VFlist, gender=True, private=True, heterozygosity=True, writetofil
         if writetofile:
             headers = sep.join(['Sample', xlab, 'Private'])
             points = [sep.join([s, str(x), str(y)]) for s,x,y in zip(DB.sampleNames, totals_all, privates)]
-            text_out += "#Plot: Private variants\n" + headers + '\n' + '\n'.join(points) + '\n\n'
+            text_out += "***Plot: Private variants***\n" + headers + '\n' + '\n'.join(points) + '\n\n'
             
     if heterozygosity:
         plotnr += 1
@@ -377,7 +379,7 @@ def QC_3plots(VFlist, gender=True, private=True, heterozygosity=True, writetofil
         if writetofile:
             headers = sep.join(['Sample', 'A'+xlab[3:], 'Heterozygosity (%)'])
             points = [sep.join([s, str(x), '%.2f'%y]) for s,x,y in zip(DB.sampleNames, totals_AUT, hets)]
-            text_out += "#Plot: Heterozygosity\n" + headers + '\n' + '\n'.join(points) + '\n\n'
+            text_out += "***Plot: Heterozygosity***\n" + headers + '\n' + '\n'.join(points) + '\n'
      
     if writetofile:
         with open(writetofile, 'w') as out:

@@ -214,15 +214,15 @@ class NgData(ColumnData):
         complete_title = title + subtitle if subtitle else title
         if subtitle:
             self.intro = '\n'.join([bord, title, subtitle, bord]) + '\n'
-            analysis_text = '\n## '.join(["STEP-BY-STEP FILTERING TABLE:", title, subtitle])
+            self.analysis_text = '\n## '.join(["STEP-BY-STEP FILTERING TABLE:", title, subtitle])
         else:    
             self.intro = '\n'.join([bord, title, bord]) + '\n'
-            analysis_text = '\n## '.join(["STEP-BY-STEP FILTERING TABLE:", title])
+            self.analysis_text = '\n## '.join(["STEP-BY-STEP FILTERING TABLE:", title])
     
     def copyAttributes(self):
         return self
         
-    def printData(self):
+    def printData(self, **kwargs): # kwargs not used for this class 
         wid1_all = [map(len, line[0].split('\n')) for line in self.variants]
         wid1_max = max(i for t in wid1_all for i in t)
         bodyaslist = [line[0] + ''.join([' ']*(wid1_max + 1 - wid1_all[i][-1])) + ''.join(s.rjust(8) for s in line[1:]) for i, line in enumerate(self.variants)]
@@ -544,7 +544,7 @@ class MultiFileData(VariantData):
             try:
                 g = gt(v)
                 return 1 if g[0] != g[2] else 0 if g[0]=='0' else 2
-            except: print g; print v[-6:]
+            except: pass
         return _f
             
     def isHomALT_vcfFIX(self):

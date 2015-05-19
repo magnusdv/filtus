@@ -12,7 +12,11 @@ import Filter
 import FiltusUtils
 import FiltusAnalysis
 import InputDialog
-
+try:
+    import FiltusQC
+    PLOT_available = 1
+except ImportError:
+    PLOT_available = 0
 
 class PedWriter(Pmw.Dialog):
     def __init__(self, filtus):
@@ -77,7 +81,7 @@ class PedWriter(Pmw.Dialog):
         self.mapCheck.add('cm', text="Convert to centiMorgan (using Decode recombination map)")
         self.mapCheck.invoke('cm')
         self.mapCheck.grid(**grid_opt)
-        print self.mapCheck.getvalue()
+        
         ## Output
         save_group = Pmw.Group(interior, tag_text = 'Output')
         save_interior = save_group.interior()
@@ -196,7 +200,6 @@ class PedWriter(Pmw.Dialog):
             what = self.whatButt.getvalue()
             dat, map, freq = 'dat' in what, 'map' in what, 'freq' in what
             maptype = self.mapCheck.getvalue()
-            print maptype
             if map and not any(maptype):
                 raise RuntimeError('At least one of the "Map options" must be checked')
             
@@ -1919,12 +1922,6 @@ class AutEx_GUI(Pmw.Dialog):
         self.summary.grid(**grid_opt)
         summary_group.grid(**grid_opt)
         
-        try:
-            import FiltusQC
-            PLOT_available = 1
-        except ImportError:
-            PLOT_available = 0
-            
         plot_group = Pmw.Group(below, tag_text = 'Plot')
         plot_interior = plot_group.interior()
         self.plotCHR = OptionMenuExt(plot_interior, label_text = "Chrom:", menubutton_padx=1, menubutton_anchor="e", menubutton_pady=1, menubutton_width=3, 
@@ -2090,12 +2087,6 @@ class PLINK_GUI(Pmw.Dialog):
         self.summary.grid(**grid_opt)
         summary_group.grid(**grid_opt)
         
-        try:
-            import FiltusQC
-            PLOT_available = 1
-        except ImportError:
-            PLOT_available = 0
-            
         plot_group = Pmw.Group(out, tag_text = 'Plot')
         plot_interior = plot_group.interior()
         self.plotCHR = OptionMenuExt(plot_interior, label_text = "Chrom:", menubutton_padx=1, menubutton_anchor="e", menubutton_pady=1, menubutton_width=3, 

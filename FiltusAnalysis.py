@@ -653,8 +653,9 @@ class NgTable(object):
 
     def table(self):
         page = self.sharingPage
+        VFall = self.filtus.files
         try:
-            page.validateEntries()
+            entries = page.validateEntries(VFall)
         except ValueError as e:
             FiltusUtils.warningMessage(e)
             return
@@ -684,10 +685,8 @@ class NgTable(object):
                 filter_args.update({'columnfilters':cfs})
             filterSteps.append((Filter.Filter(**filter_args), step_text))
 
-        VFall = self.filtus.files
         if self.count_what == 'genes':
-            model = page.model.getvalue()
-            cases, controls = page.getCases(), page.getControls()
+            model, cases, controls = entries['model'], entries['VFcases_index'], entries['VFcontrols_index']
             if model == 'Dominant': subtitle = 'Dominant model.'
             elif model == 'Recessive': subtitle = 'Recessive model (homozygous or compound heterozygous).'
             else: subtitle = 'Recessive model (homozygous only.)'
@@ -734,7 +733,7 @@ class NgTable(object):
             VFlist = [filter.apply(VF, checks=False) for VF in VFlist]
             filter2 = Filter.Filter(model=model, controls = [VFlist[i] for i in controls], benignPairs=True)
             affVFlist = [filter2.apply(VFlist[i], checks=False) for i in cases]
-            Ngrow = self._Ngrow(makeGeneDict(affVFlist, VFindex=range(affVFlist)), ind_order)
+            Ngrow = self._Ngrow(makeGeneDict(affVFlist, VFindex=range(len(affVFlist))), ind_order)
             coldat.append([stepText] + [str(i) for i in Ngrow])
         return coldat
 

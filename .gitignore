@@ -56,5 +56,6 @@ docs/_build/
 # PyBuilder
 target/
 
-# Magnus junk files
+# Magnus test files
 kast*.txt
+filtus__plink__homozyg.*
