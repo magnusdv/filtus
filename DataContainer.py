@@ -3,7 +3,6 @@ import re
 import collections
 from operator import itemgetter
 
-import Filter
 import FiltusUtils
 
 #import memory_profiler
@@ -233,7 +232,7 @@ class NgData(ColumnData):
  
 class VariantData(ColumnData):
     def __init__(self, filename, columnNames, variants, chromCol, posCol, geneCol, gtCol, homSymbol=None, 
-                 columnDescriptions=None, appliedFilters=None, startupFilter=None, nGenes=None, meta=''):
+                 columnDescriptions=None, appliedFilters=None, prefilter=None, nGenes=None, meta=''):
         ColumnData.__init__(self, columnNames, variants, columnDescriptions, meta=meta)
 
         self.filename = filename
@@ -256,11 +255,7 @@ class VariantData(ColumnData):
         self.chromPosRefAlt = None # used in VCF files
         
         self.appliedFilters = appliedFilters ## NB! Will be overwritten by other filters!
-        if startupFilter is not None:
-            if isinstance(startupFilter, basestring):
-                startupFilter = Filter.Filter(filterFile=startupFilter)
-            startupFilter.checks(self)
-            startupFilter.apply(self, checks = False, inplace=True)
+        self.prefilter = prefilter
         self.nGenes = len(self.getUniqueGenes()) if nGenes is None else nGenes
         self._mainAttributes += ['filename', 'chromCol', 'posCol', 'geneCol', 'gtCol', 'homSymbol', 'nGenes']
         
@@ -452,11 +447,11 @@ class VariantData(ColumnData):
 
 class VCFtypeData(VariantData):
     def __init__(self, filename, columnNames, columnDescriptions, variants, chromCol, posCol, geneCol, 
-                 formatHeads, splitFormat, splitInfo,  startupFilter=None, appliedFilters=None, keep00=None, nGenes=None, meta=''):    
+                 formatHeads, splitFormat, splitInfo,  prefilter=None, appliedFilters=None, keep00=None, nGenes=None, meta=''):    
         gtCol = 'GT' if splitFormat else columnNames[-1]
         homSymbol = '<vcf format>'
         VariantData.__init__(self, filename, columnNames, variants, chromCol, posCol, geneCol, gtCol, homSymbol, 
-                             columnDescriptions=columnDescriptions, startupFilter=startupFilter, appliedFilters=appliedFilters, nGenes=nGenes, meta=meta)
+                             columnDescriptions=columnDescriptions, prefilter=prefilter, appliedFilters=appliedFilters, nGenes=nGenes, meta=meta)
         self.splitFormat = splitFormat 
         self.splitInfo = splitInfo
         self.isVCFtype = True

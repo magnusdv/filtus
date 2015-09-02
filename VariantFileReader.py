@@ -7,11 +7,13 @@ class VariantFileReader(object):
     def __init__(self):
         pass
         
-    def readNonVCF(self, filename, sep, splitAsInfo=None, split_general=None, skiplines=0, **params): # gtCol, homSymbol:
+    def readNonVCF(self, filename, sep, splitAsInfo=None, split_general=None, skiplines=0, prefilter=None, **params): # gtCol, homSymbol:
         with open(filename, "rU") as ifile:
             for i in range(skiplines): ifile.next()
+            headers = [h.strip() for h in ifile.next().split(sep)] # must do this before prefilter
+            if prefilter is not None: 
+                ifile = self._applyPrefilter(ifile, prefilter)
             reader = csv.reader(ifile, delimiter = sep, skipinitialspace = True, strict=True)
-            headers = reader.next()
             if splitAsInfo or split_general:
                 variants = [row for row in reader]
             else:
@@ -37,7 +39,7 @@ class VariantFileReader(object):
         return DataContainer.VariantData(filename=filename, columnNames=headers, variants=variants, **params)
 
     def readVCFlike(self, filename, sep, chromCol, posCol, geneCol, keep00=0, split_general=[],
-                    splitAsInfo="", formatCol="FORMAT", splitFormat=1, commentChar="##", startupFilter=None):
+                    splitAsInfo="", formatCol="FORMAT", splitFormat=1, commentChar="##", prefilter=None):
         preamble = []
         with open(filename, "rU") as ifile:
             line = ifile.next()
@@ -45,9 +47,13 @@ class VariantFileReader(object):
                 preamble.append(line)
                 line = ifile.next()
             headers = [h.strip() for h in line.split(sep)]
-            
+            if prefilter is not None: 
+                ifile = self._applyPrefilter(ifile, prefilter)
             data = [row for row in csv.reader(ifile, delimiter = sep, skipinitialspace = False, strict=True)] # saving time (?) with skip.. = False
         descriptions = self._parseDescriptions(preamble)
+        
+        if len(data) == 0: 
+            raise RuntimeError("No variants in file")
         
         if headers[-1] == "Otherinfo": ### Annovar fix: Re-inserting VCF column names.
             headers = self._fixAnnovarOtherinfo(headers, firstvar=data[0])
@@ -74,7 +80,7 @@ class VariantFileReader(object):
         else:
             def missing(val): return len(val) < 3 or (val[2] in ['0', '.'] and val[0] in ['0', '.'])
         
-        paramsVCF = dict(chromCol=chromCol, posCol=posCol, geneCol=geneCol, startupFilter=startupFilter,
+        paramsVCF = dict(chromCol=chromCol, posCol=posCol, geneCol=geneCol, prefilter=prefilter,
                  splitFormat=splitFormat, splitInfo=bool(splitAsInfo), keep00=keep00, formatHeads=formatHeads)
         VFlist = []
         Nsamples = len(data[0]) - (formatIndex+1) 
@@ -95,6 +101,15 @@ class VariantFileReader(object):
             
         return VFlist
 
+    def _applyPrefilter(self, fileObject, prefilter):
+        operatorText, value = prefilter
+        operatorDic = {'start with' : FiltusUtils.mystartswith, 'do not start with' : FiltusUtils.not_mystartswith,
+                      'contain' : FiltusUtils.contains, 'do not contain' : FiltusUtils.not_contains}
+        if operatorText not in operatorDic:
+            raise KeyError('Unknown prefilter operator: "%s". Legal values are "start with", "do not start with", "contain" and "do not contain".' % operatorText)
+        operator = operatorDic[operatorText]
+        return (line for line in fileObject if operator(line, value))
+        
     def _getFormatHeads(self, data, formatIndex):
         formats = set(x[formatIndex] for x in data)
         allEqual = len(formats) == 1
@@ -184,6 +199,10 @@ if __name__ == "__main__":
     testfile = "example_files\\test_file.csv"
     vflist = reader.readVCFlike(testfile, sep=",", chromCol="CHROM", posCol="POS", geneCol="Gene", splitAsInfo="INFO", keep00=1)
     assert vflist[0].length == 425
+    vflist = reader.readVCFlike(testfile, sep=",", chromCol="CHROM", posCol="POS", geneCol="Gene", splitAsInfo="INFO", keep00=1, prefilter=("contain", "splic"))
+    assert vflist[0].length == 10
+    #vflist = reader.readVCFlike(testfile, sep=",", chromCol="CHROM", posCol="POS", geneCol="Gene", splitAsInfo="INFO", keep00=1, prefilter=("contain", "BOGUS TEXT"))
+    #assert vflist[0].length == 10
     
     
     

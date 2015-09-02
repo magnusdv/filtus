@@ -1,7 +1,6 @@
 import Tkinter
 import Pmw
 import csv
-import Filter
 import FiltusWidgets
 import FiltusUtils
 
@@ -38,7 +37,7 @@ class InputDialog(object):
         self.splitFormatVar = Tkinter.IntVar(self.parent)
         self.keep00Var = Tkinter.IntVar(self.parent)
         
-        self.filter = None
+        self.prefilter = None
         self.skiplines = 0
         self.prompt = True
         self.guess = False
@@ -63,7 +62,7 @@ class InputDialog(object):
         self.fileLabel = Tkinter.Label(filename_group.interior(), justify = "left", font = self.filtus.textfont)
 
         grid_nw = dict(sticky='nw', padx=10, pady=2)
-        grid_nw_right = dict(sticky='nw', padx=(15, 10), pady=2)
+        grid_nw_right = dict(sticky='nw', padx=(20, 10), pady=2)
         
         self.fileLabel.grid(row=0, column=1, **grid_nw)
 
@@ -76,10 +75,10 @@ class InputDialog(object):
 
         self.sepInputOM = OM(basic_interior, label_text = "Column separator:", items = self._separators,
                                         command=self._readAndSetHeaders, **OM_OPTIONS)
-        self.commentEntry = Pmw.EntryField(basic_interior, label_text = "Skip lines starting with:", value = self.commentChar,
+        self.commentEntry = Pmw.EntryField(basic_interior, label_text = "Preamble lines start with:", value = self.commentChar,
                                 modifiedcommand=self._noDefButton, command=self._readAndSetHeaders, entry_width=12, **pmw_OPTIONS)
         self.sepInputOM.grid(row=0, column=0, **grid_nw)
-        self.commentEntry.grid(row=0, column=1,  sticky='nwe', padx=(20, 12), pady=2)
+        self.commentEntry.grid(row=0, column=1,  **grid_nw_right)
         
         ### variant settings
         variant_group = Pmw.Group(fr, tag_text = 'Variant settings')
@@ -89,7 +88,7 @@ class InputDialog(object):
         self.geneColMenu = OM(variant_interior, label_text = "Gene name column:", **OM_OPTIONS)
         
         self.chromColMenu.grid(row=0, column=0, **grid_nw)
-        self.posColMenu.grid(row=0, column=1, **grid_nw_right)#padx=(20, 10), pady=2, sticky='nw')
+        self.posColMenu.grid(row=0, column=1, **grid_nw_right)
         self.geneColMenu.grid(row=1, column=0, **grid_nw)
         
         Tkinter.Frame(variant_interior, height=2, borderwidth=2, relief="sunken").grid(sticky='ew', pady=(8,4), columnspan=2)
@@ -103,7 +102,7 @@ class InputDialog(object):
         self.VCFframe = Tkinter.Frame(variant_interior)
         self.formatColMenu = OM(self.VCFframe, label_text = "FORMAT column:",  **OM_OPTIONS)
         self.formatColMenu.grid(**grid_nw)
-        Tkinter.Checkbutton(self.VCFframe, text="Keep 0/0 (NB: only for autozygosity/de novo)", 
+        Tkinter.Checkbutton(self.VCFframe, text="Keep 0/0   (only for autozygosity/de novo)", 
             variable=self.keep00Var, anchor='w').grid(row=0, column=1, **grid_nw_right)
             
         self.nonVCFframe = Tkinter.Frame(variant_interior)
@@ -131,26 +130,31 @@ class InputDialog(object):
         self.splitcol2_sep = Pmw.EntryField(split_interior, label_text = "by separator", entry_width=4, **pmw_OPTIONS)
         
         self.splitcol1Menu.grid(**grid_nw)
-        self.splitcol1_sep.grid(row=2, column=1, padx=2, pady=2, sticky='nw')
+        self.splitcol1_sep.grid(row=2, column=1, **grid_nw)
         self.splitcol2Menu.grid(**grid_nw)
-        self.splitcol2_sep.grid(row=3, column=1, padx=2, pady=2, sticky='nw')
+        self.splitcol2_sep.grid(row=3, column=1, **grid_nw)
         
-        self.filter_group = Pmw.Group(fr, tag_text = "Filter options")
-        filter_interior = self.filter_group.interior()
-        filter_interior.columnconfigure(0, weight=1)
-        self.startupFilter = FiltusWidgets.FileBrowser(filter_interior, 
-            filtus=self.filtus, label="Apply filter file:", checkbutton=False,
-            entryfield_labelmargin=10, browsetitle="Select filter configuration file")
-        self.startupFilter.component('entryfield').configure(command=None)
-        self.startupModel = FiltusWidgets.ModelSelect(filter_interior, labelmargin=5)
-        self.closePairs = Pmw.Counter(filter_interior, label_text = "Remove variant pairs closer than (bp):", entry_width=4,
-                                    entryfield_validate = {'validator' : 'integer', 'min' : '0', 'max' : '1000'},
-                                    entryfield_value = 0, entry_justify = 'center', datatype = 'integer', **pmw_OPTIONS)
+        prefilter_group = Pmw.Group(fr, tag_text = "Prefilter")
+        prefilter_interior = prefilter_group.interior()
+        prefilter_interior.columnconfigure(1, weight=1)
+        self.prefilter_operatorOM = OM(prefilter_interior, label_text = "Keep only lines which ", items = ['', 'contain', 'do not contain', 'start with', 'do not start with'], **OM_OPTIONS)
+        self.prefilter_valueEntry = Pmw.EntryField(prefilter_interior, entry_width=10, **pmw_OPTIONS)
         
-        self.startupFilter.grid(sticky='news', padx=10, pady=2)
-        self.startupModel.grid(**grid_nw)
-        self.closePairs.grid(**grid_nw)
-        for g in (filename_group, basic_group, variant_group, split_group, self.filter_group):
+        self.prefilter_operatorOM.grid(row=0, column=0, **grid_nw)
+        self.prefilter_valueEntry.grid(row=0, column=1, sticky='nwe', padx=(0, 10), pady=2)
+        
+        #self.startupFilter = FiltusWidgets.FileBrowser(filter_interior, 
+        #    filtus=self.filtus, label="Apply filter file:", checkbutton=False,
+        #    entryfield_labelmargin=10, browsetitle="Select filter configuration file")
+        #self.startupFilter.component('entryfield').configure(command=None)
+        #self.startupModel = FiltusWidgets.ModelSelect(filter_interior, labelmargin=5)
+        #self.closePairs = Pmw.Counter(filter_interior, label_text = "Remove variant pairs closer than (bp):", entry_width=4,
+                                    #entryfield_validate = {'validator' : 'integer', 'min' : '0', 'max' : '1000'},
+                                    #entryfield_value = 0, entry_justify = 'center', datatype = 'integer', **pmw_OPTIONS)
+        #self.startupFilter.grid(sticky='news', padx=10, pady=2)
+        #self.startupModel.grid(**grid_nw)
+        #self.closePairs.grid(**grid_nw)
+        for g in (filename_group, basic_group, variant_group, split_group, prefilter_group):
             g.configure(ring_borderwidth=1, tag_font = self.filtus.smallbold)
             g.grid(sticky='news', pady=6, padx=10, ipady=2)
         self.align()
@@ -171,7 +175,7 @@ class InputDialog(object):
         
     def align(self):
         Pmw.alignlabels([self.sepInputOM, self.chromColMenu, self.vcfChooser, self.geneColMenu, self.formatColMenu, self.gtColMenu, 
-            self.startupFilter.component('entryfield'), self.startupModel, self.infoColMenu, self.splitcol1Menu, self.splitcol2Menu], sticky='w') 
+            self.prefilter_operatorOM, self.infoColMenu, self.splitcol1Menu, self.splitcol2Menu], sticky='w') 
         Pmw.alignlabels([self.commentEntry, self.homSymbolEntry], sticky='w')
         
         
@@ -192,31 +196,25 @@ class InputDialog(object):
                 return
             
             self.filtus.busy()
-            common_params = dict(filename=filename, sep=self.sep, chromCol=self.chromCol, posCol=self.posCol, #headers=self.originalHeaders, 
-                            geneCol=self.geneCol, splitAsInfo=self.infoCol, split_general=self.split_general, startupFilter=self.filter)
+            common_params = dict(filename=filename, sep=self.sep, chromCol=self.chromCol, posCol=self.posCol, geneCol=self.geneCol, 
+                                splitAsInfo=self.infoCol, split_general=self.split_general, prefilter=self.prefilter)
+            
             if self.vcf:
                 VF = self.reader.readVCFlike(formatCol=self.formatCol, splitFormat=self.splitFormat, keep00=self.keep00, **common_params)
             else:
                 VF = self.reader.readNonVCF(skiplines=self.skiplines, gtCol=self.gtCol, homSymbol=self.homSymbol, **common_params)
             self.filtus.notbusy()
             
-        except (csv.Error, IOError) as e:
-            self.filtus.notbusy()
-            typ = type(e).__name__
-            FiltusUtils.warningMessage("I cannot read this file:\n%s\n\n%s: %s" %(filename, typ, e))
-            self.skipFile = True
-            return
         except (ValueError, RuntimeError) as e:
             self.filtus.notbusy()
             FiltusUtils.warningMessage(e)
             return self.read(filename, guess = False, prompt=True)
         except Exception as e:
             self.filtus.notbusy()
-            raise
             typ = type(e).__name__
-            FiltusUtils.warningMessage("Sorry - an unknown error has occurred while reading '%s'. A bug report to magnusdv@medisin.uio.no would be appreciated\n\n%s: %s" %(filename, typ, e))
+            FiltusUtils.warningMessage("An error occured while reading this file:\n%s\n\n%s: %s\n\nPlease try again or skip file." %(filename, typ, e))
             return self.read(filename, guess=False, prompt=True)
-            
+        
         if self.checkHomozygosity and VF.noHomozygotes():
             tryagain = FiltusUtils.yesnoMessage('The file %s has no homozygous variants. Go back to settings dialog?'%filename)
             if tryagain:
@@ -300,7 +298,12 @@ class InputDialog(object):
                 split, sep = s[1]
                 self.splitcol2Menu.setAndCheck(split)
                 self.splitcol2_sep.setvalue(sep)
-                
+        
+        if 'prefilter' in kwargs:
+            operatorText, value = kwargs['prefilter']
+            self.prefilter_operatorOM.setAndCheck(operatorText)
+            self.prefilter_valueEntry.setvalue(value)
+            
     def _getFirstLines(self, filename, n=1):
         self.skiplines = 0
         firstlines = []
@@ -466,12 +469,13 @@ class InputDialog(object):
         self.split_general = [(self.splitcol1, self.splitcol1_sep.getvalue()), (self.splitcol2, self.splitcol2_sep.getvalue())]
         self.split_general = [(x,y) for x,y in self.split_general if x]
         
+        self.prefilter = (self.prefilter_operatorOM.getvalue(), self.prefilter_valueEntry.getvalue())
+        if self.prefilter[0] == '' or self.prefilter[1] == '': 
+            self.prefilter = None
+            
         if not self.chromCol: raise RuntimeError("Please indicate chromosome column.")
         if not self.posCol: raise RuntimeError("Please indicate position column.")
         
-        if not self.geneCol and self.startupModel.getvalue() == 'Recessive': 
-            raise RuntimeError("Gene column must be indicated when using a compound heterozygous model.")
-            
         if self.vcf:
             if not self.formatCol: raise RuntimeError("Please indicate vcf-like FORMAT column.")
         else:
@@ -480,28 +484,13 @@ class InputDialog(object):
                 raise RuntimeError("Missing symbol for homozygous genotype.")
             if self.homSymbol and not self.gtCol: 
                 raise RuntimeError("Symbol of homozygosity given, but no genotype column.")
-            if not self.gtCol and self.startupModel.getvalue() != 'Dominant': 
-                raise RuntimeError("Genotype column must be indicated when using recessive models.")
         
         for x in [x for x,y in self.split_general if not y]:
             raise RuntimeError("Please indicate splitting separator for column '%s'." % x)
+        if len(self.split_general)==2 and self.split_general[0][0] == self.split_general[1][0]:
+            raise RuntimeError("Column cannot be split twice: '%s'." % self.split_general[0][0])
     
-        try:
-            self.filter = self._getStartupFilter()
-        except Exception as e:
-            raise RuntimeError("Error in filter configuration file:\n\n%s"%e)
-    
-    def _getStartupFilter(self):
-        model = self.startupModel.getvalue()
-        startupFilterFile = self.startupFilter.getvalue()
-        closePairLimit = int(self.closePairs.getvalue())
-
-        if model != 'Dominant' or startupFilterFile or closePairLimit > 0:
-            filter = Filter.Filter(filterFile=startupFilterFile, model = model, closePairLimit = closePairLimit, filtus = self.filtus)
-        else:
-            filter = None
-        return filter
-
+        
     def _noDefButton(self):
         '''this is invoked when modifying the commentCharEntry, to stop <Return> from jump to the default button.'''
         self.dialog.component('buttonbox').setdefault(None)

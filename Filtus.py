@@ -593,7 +593,7 @@ if v[:2] != (2,7):
 
 root = Tk()
 Pmw.initialise(root)
-filtus = Filtus(root, version="0.99-93")
+filtus = Filtus(root, version="0.99-94")
 root.title("FILTUS " + filtus.version)
 
 if __name__ == "__main__":
@@ -603,6 +603,13 @@ if __name__ == "__main__":
     test_vcf = "C:\\Projects\\FILTUS\\Testfiles\\vcf_example.vcf"
     triotest = "C:\\Projects\\FILTUS\\Testfiles\\triotest.txt" 
     
+    def test_version():
+        '''checks that the correct version number is used when saving output files'''
+        import inspect
+        a = inspect.getargspec(FiltusUtils.preambleNY) # version number is the last argument of this function
+        save_version = a.defaults[-1]
+        assert save_version == filtus.version
+        
     def test_loading():
         filtus.clearAll()
         filtus.loadFiles([test_csv[0]], guess=1, prompt=0, geneCol="")
@@ -689,12 +696,16 @@ if __name__ == "__main__":
         summarymenu = filtus.menuBar.component('columnsum-menu')
         summarymenu.invoke(0)
     
-    def test_geneloopkup():
+    def test_geneloopkup(): #TODO
         filtus.clearAll()
-        filtus.loadFiles(test_csv, guess=1, prompt=0, splitAsInfo="INFO")
-        summarymenu = filtus.menuBar.component('columnsum-menu')
-        summarymenu.invoke(0)
-    
+        filtus.loadFiles(test_csv[:1], guess=1, prompt=0, geneCol="Gene", splitAsInfo="")
+        variants = FiltusAnalysis.geneLookup(["KIAA1751", "_FOO_"], VFlist=filtus.files)
+        variants.save("_kast.txt")
+        assert variants.length == 4 == variants.collapse().length
+        filtus.loadFiles(test_csv, guess=1, prompt=0, geneCol="Gene", splitAsInfo="", prefilter=("do not contain", "_foo_"))
+        variants = FiltusAnalysis.geneLookup(["KIAA1751", "_FOO_"], VFlist=filtus.files)
+        assert variants.length == 8 == 2*variants.collapse().length
+        
     def test_advancedload():
         filtus.clearAll()
         filtus.advLoad = FiltusWidgets.AdvancedLoad(filtus)
@@ -712,10 +723,12 @@ if __name__ == "__main__":
         filtus.plinkgui.execute("Compute")
         filtus.plink_prompt()
     
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 1 and sys.argv[1]=="test":
+        test_version()
         test_loading()
         test_advancedload()
         test_summary()
+        test_geneloopkup()
         test_sharing()
         test_qc()
         test_denovo()

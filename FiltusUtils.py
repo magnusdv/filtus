@@ -19,7 +19,7 @@ def activateInCenter(parent, widget):
     y = offy + height/8
     return widget.activate(geometry='+%d+%d' %(x, y))
 
-def preambleNY(VFlist=None, VFindex=None, sort=True, analysis=None, appendTo=None, version='0.99-2'):
+def preambleNY(VFlist=None, VFindex=None, sort=True, analysis=None, appendTo=None, version='0.99-94'):
     txt = '###############################################################\n' \
           '####  FILTUS %s, analysis performed %s  ####\n' \
           '###############################################################\n' \
@@ -34,8 +34,32 @@ def preambleNY(VFlist=None, VFindex=None, sort=True, analysis=None, appendTo=Non
         samplenames = ['%d: %s' %(i + 1, VF.longName) for i, VF in zip(VFindex, VFlist)]
         txt += '\n## '.join(["## SAMPLES:"] + samplenames + ['\n'])
 
+        ### Prefilters
+        all_prefilters = [VF.prefilter for VF in VFlist]
+        prefilters = list({f for f in all_prefilters if f})
+        
+        if len(prefilters) == 0: 
+            txt += "## PREFILTERS: None\n##\n"
+        elif all(f == prefilters[0] for f in all_prefilters):
+            filtertext = 'Keep lines which %s %r' %prefilters[0]
+            if len(VFlist) == 1: 
+                txt += "## PREFILTER APPLIED:\n## %s\n##\n" % filtertext
+            else:
+                txt += "## PREFILTER APPLED TO ALL SAMPLES:\n## %s\n##\n" % filtertext
+        else:
+            txt += "## PREFILTERS:\n"
+            # list of all pairs (ids, fi) where ids are the samples having the filter fi
+            IDs = [([i + 1 for i, f in enumerate(all_prefilters) if f==pref], pref) for pref in prefilters]
+            IDs.sort(key=lambda x: x[0][0])
+            
+            for ids, pref in IDs:
+                filtertext = 'Keep lines which %s %r' %pref
+                txt += "## Applied to %s: %s\n" %(', '.join(map(str,ids)), filtertext)
+            txt += "##\n"
+                
+        ### Filters
         all_filters = [VF.appliedFilters for VF in VFlist]
-        filters = {f for f in all_filters if f and f.details()}
+        filters = list({f for f in all_filters if f and f.details()})
         
         if len(filters) == 0:
             txt += "## FILTERS: None\n##\n"
@@ -52,6 +76,7 @@ def preambleNY(VFlist=None, VFindex=None, sort=True, analysis=None, appendTo=Non
                     txt += "## FILTERS APPLIED TO SAMPLE %s:\n%s\n##\n" %(IDs[0], str(filt))
                 else:
                     txt += "## FILTERS APPLIED TO SAMPLES %s:\n%s\n##\n" %(', '.join(IDs), str(filt))
+    
     if analysis:
         txt += "## ANALYSIS: %s\n##\n" %analysis
     if appendTo:
