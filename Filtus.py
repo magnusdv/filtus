@@ -90,7 +90,7 @@ class Filtus(object):
         self.gs = FiltusWidgets.GeneSharingPage(self.sharingNotebook, self, 'Gene sharing')
         self.fs = FiltusWidgets.GeneSharingPage(self.sharingNotebook, self, 'Gene sharing fam', family=True)
         self.vs = FiltusWidgets.VariantSharingPage(self.sharingNotebook, self, 'Variant sharing')
-        self.dn = FiltusWidgets.DeNovoPage(self.sharingNotebook, self, 'De novo')
+        #self.dn = FiltusWidgets.DeNovoPage(self.sharingNotebook, self, 'De novo')
         
         self.sharingNotebook.setnaturalsize()
         self.sharingNotebook.grid(row=2, sticky='new', pady=(10, 0))
@@ -217,8 +217,10 @@ class Filtus(object):
         menuBar.addmenuitem('Filters', 'command', None, command=self.multiFilter_prompt, label='Individual filtering', font=self.defaultfont)
         
         menuBar.addmenu('Analysis', None)
-        menuBar.addmenuitem('Analysis', 'command', None, command=self.plink_prompt, label="Runs of homozygosity - PLINK", font=self.defaultfont)
-        menuBar.addmenuitem('Analysis', 'command', None, command=self.autozyg_prompt, label="Regions of autozygosity - AutEx", font=self.defaultfont)
+        menuBar.addmenuitem('Analysis', 'command', None, command=self.autozyg_prompt, label="AutEx: Regions of autozygosity", font=self.defaultfont)
+        menuBar.addmenuitem('Analysis', 'command', None, command=self.plink_prompt, label="PLINK: Runs of homozygosity", font=self.defaultfont)
+        menuBar.addmenuitem('Analysis', 'separator')
+        menuBar.addmenuitem('Analysis', 'command', None, command=self.denovo_prompt, label="De novo variant detection", font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'separator')
         menuBar.addmenuitem('Analysis', 'command', None, command=self.pairwiseSharing, label='Pairwise variant sharing', font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'separator')
@@ -302,6 +304,16 @@ class Filtus(object):
             self.plinkgui = FiltusWidgets.PLINK_GUI(self)
         FiltusUtils.activateInCenter(self.parent, self.plinkgui)
 
+    def denovo_prompt(self):
+        if not self.checkLoadedSamples(select="all", VF=False, minimum=1, maximum=1):
+            return
+        if not hasattr(self, 'denovogui'):
+            self.denovogui = FiltusWidgets.DeNovo_GUI(self)
+        try:
+            FiltusUtils.activateInCenter(self.parent, self.denovogui)
+        except Exception as e:
+            FiltusUtils.warningMessage("%s: %s" %(type(e).__name__, e))
+    
     def pedwriter_prompt(self):
         if not self.checkLoadedSamples(select="all"):
             return
@@ -431,7 +443,7 @@ class Filtus(object):
         Pmw.alignlabels([self.sepOutputOM, self.generalfontSizeEntry, self.textfontSizeEntry]) # not in separate class...TODO.
 
     def clearAll(self):
-        for w in [self.fileListbox, self.fileSummary1, self.fileSummary2, self.text, self.gs, self.vs, self.fs, self.dn]:
+        for w in [self.fileListbox, self.fileSummary1, self.fileSummary2, self.text, self.gs, self.vs, self.fs]:
             w.clearAll()
         self.files, self.filteredFiles, self.longFileNameList, self.shortFileNameList, self.currentFileNameList = [], [], [], [], []
         self.fileListbox.settoptext('Loaded samples: 0')
@@ -639,18 +651,19 @@ if __name__ == "__main__":
     def test_denovo():
         filtus.clearAll()
         filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
-        dn = filtus.dn
-        dn.focus()
+        dn = FiltusWidgets.DeNovo_GUI(filtus)
+        dn._prepare()
         dn.child.setvalue('ID CH')
         dn.father.setvalue('ID FA')
         dn.mother.setvalue('ID MO')
-        dn.freqMenu.setvalue('1000g2012apr_all')
-        dn.freqEntry.setvalue('0.1')
-        dn.button.invoke()
+        dn._altFreqMenu.setvalue('1000g2012apr_all')
+        dn._def_freq_entry.setvalue('0.1')
+        dn.execute("Compute")
+        dn.activate()
         dn2 = FiltusAnalysis.DeNovoComputer()
         res1 = filtus.text.currentColDat
         ch, fa, mo = filtus.files
-        res2 = dn2.analyze(VFch=ch, VFfa=fa, VFmo=mo, trioID=[0,1,2], mut=1e-8, defaultFreq=0.1, altFreqCol='1000g2012apr_all')
+        res2 = dn2.analyze(VFch=ch, VFfa=fa, VFmo=mo, trioID=[0,1,2], mut=1e-8, defaultFreq=0.1, altFreqCol='1000g2012apr_all', minALTchild=30, maxALTparent=10)
         assert res1.length == res2.length
         assert all(a[0]==b[0] for a,b in zip(res1.variants, res2.variants))
     
@@ -723,18 +736,23 @@ if __name__ == "__main__":
         filtus.plinkgui.execute("Compute")
         filtus.plink_prompt()
     
-    if len(sys.argv) > 1 and sys.argv[1]=="test":
-        test_version()
-        test_loading()
-        test_advancedload()
-        test_summary()
-        test_geneloopkup()
-        test_sharing()
-        test_qc()
-        test_denovo()
-        test_plink()
-        test_autex()
-        print 'all tests passed'
-        
+    
+    if len(sys.argv) > 1 and sys.argv[1].startswith("test"):
+        if sys.argv[1] == "test":
+            test_denovo()
+            test_version()
+            test_loading()
+            test_advancedload()
+            test_summary()
+            test_geneloopkup()
+            test_sharing()
+            test_qc()
+            test_plink()
+            test_autex()
+            print 'all tests passed'
+        else:
+            locals()[sys.argv[1]]()
+    
+    
 root.mainloop()
 

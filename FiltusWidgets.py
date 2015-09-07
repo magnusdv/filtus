@@ -593,6 +593,7 @@ class VariantView(Pmw.Dialog):
         variantDat = FiltusAnalysis.genotypeData(vdef, self.filtus.files)
         self.text.prettyPrint(variantDat, pad=5)
         FiltusUtils.activateInCenter(self.filtus.parent, self)
+
         
 class SharingPage(object):
     def __init__(self, notebook, filtus, title):
@@ -663,6 +664,7 @@ class SharingPage(object):
             self.displayResult(resultVF)
         except ValueError as e:
             FiltusUtils.warningMessage(e)
+
             
 class GeneSharingPage(SharingPage):
     def __init__(self, notebook, filtus, title, family=False):
@@ -781,7 +783,6 @@ class GeneSharingPage(SharingPage):
                            "\nGenes (cumul): " + "".join('%6d' %i for i in cumsum))    
         self.filtus.text.prettyPrint(resultVF, rightClick = self.rightClickMenu)
         
-    
                                   
 class VariantSharingPage(SharingPage):
     def __init__(self, notebook, filtus, title):
@@ -867,106 +868,8 @@ class VariantSharingPage(SharingPage):
     def displayResult(self, resultVF):
         self.filtus.text.prettyPrint(resultVF, rightClick = None)
         self.summary.settext("Variants found: %d" % resultVF.length)
-
-class DeNovoPage(SharingPage):
-    def __init__(self, notebook, filtus, title):
-        SharingPage.__init__(self, notebook, filtus, title)
-        self.sharingComputer = FiltusAnalysis.DeNovoComputer()
-        self.interior.rowconfigure(0, weight=1)
-        self.interior.columnconfigure(0, weight=0)
-        
-        trioframe = Tkinter.Frame(self.interior)
-        trioframe.rowconfigure(0, weight=1)
-        trioframe.rowconfigure(1, weight=1)
-        trioframe.rowconfigure(2, weight=1)
-        self.child = Pmw.EntryField(trioframe, entry_width=6, label_text = "Child:", labelpos='w', labelmargin=5, 
-                                    modifiedcommand=self._setFreqCols)
-        self.father = Pmw.EntryField(trioframe, entry_width=6, label_text = "Father:", labelpos='w', labelmargin=5)
-        self.mother = Pmw.EntryField(trioframe, entry_width=6, label_text = "Mother:", labelpos='w', labelmargin=5)
-        self.child.grid(row=0, column=0, sticky='w')
-        self.father.grid(row=1, column=0, sticky='w')
-        self.mother.grid(row=2, column=0, sticky='w')
-        
-        settingsframe = Tkinter.Frame(self.interior)
-        settingsframe.rowconfigure(0, weight=1)
-        settingsframe.rowconfigure(1, weight=1)
-        settingsframe.rowconfigure(2, weight=1)
-        self.freqMenu = OptionMenuExt(settingsframe, label_text = "ALT allele freqs:", menubutton_anchor = 'w', 
-                                      menubutton_padx=5, menubutton_pady=1, menubutton_width=12, labelmargin = 2, labelpos='w', 
-                                      menu_font = self.filtus.defaultfont)
-        real01 = dict(validator='real', min=1e-16, max=1-1e-16, minstrict=0, maxstrict=0)
-        self.freqEntry = Pmw.EntryField(settingsframe, entry_width=6, label_text = "or:", labelpos='w', labelmargin=5,
-                          validate=real01)
-        self.mutEntry = Pmw.EntryField(settingsframe, entry_width=7, label_text = "Mutation rate:", 
-                           labelpos='w', value="1e-8", labelmargin=5, validate=real01)
-        
-        self.align()
-        self.mutEntry.grid(row=0, column=0, padx=0, pady=0, sticky='w')
-        self.freqMenu.grid(row=1, column=0, padx=0, pady=3, sticky='we')
-        self.freqEntry.grid(row=1, column=1, padx=(3,0), pady=3, sticky='e')
-
-        trioframe.grid(row=0, column=0, padx=5, pady=(10,0), sticky='nws')
-        Tkinter.Frame(self.interior, width=2, bd=2, relief="sunken").grid(row=0, column=1, pady=(10,0), padx=7, sticky='ns')
-        settingsframe.grid(row=0, column=2, padx=(0,5), pady=(10,0), sticky='nws')
-
-        self.fields = [self.child, self.father, self.mother]
-        
-    def validateEntries(self, loadedVFs):
-        loadedFilenames = [VF.longName for VF in loadedVFs]
-        childID = self.readIDfield(self.child, loadedFilenames) #returns list
-        fathID = self.readIDfield(self.father, loadedFilenames)
-        mothID = self.readIDfield(self.mother, loadedFilenames)
-        for name, id in zip(['Child', 'Father', 'Mother'], [childID, fathID, mothID]):
-            if not id:
-                raise ValueError("'%s' field cannot be empty." % name)
-            if len(id) > 1:
-                raise ValueError("'%s': Please enter the ID of exactly one individual." % name)
-        
-        FiltusUtils.checkDuplicates([childID, fathID, mothID])
-        self.confirmColumns([childID, fathID, mothID], columnnames=['GT', 'PL'])
-        
-        # after all this checking we can remove the list structure:
-        childID, fathID, mothID = childID[0], fathID[0], mothID[0]
-        
-        
-        for name, floatentry in zip(["mutation rate", "default ALT allele frequency"], [self.mutEntry, self.freqEntry]):
-            try:
-                val = float(floatentry.getvalue())
-                if val <= 0 or val >= 1: raise ValueError
-            except ValueError as e:
-                message = "Invalid %s: %s\n\n%s"%(name, floatentry.getvalue(), e)
-                raise ValueError(message)
-        
-        mut = float(self.mutEntry.getvalue())
-        defaultFreq = float(self.freqEntry.getvalue())
-        altFreqCol = self.freqMenu.getvalue()
-        trioID = [childID, fathID, mothID]
-        
-        input = dict(VFch=loadedVFs[childID], VFfa=loadedVFs[fathID], VFmo=loadedVFs[mothID], trioID=trioID, mut=mut, altFreqCol=altFreqCol, defaultFreq=defaultFreq)
-        return input
-        
-    def displayResult(self, resultVF):
-        post50 = sum(float(x[0])>=0.5 for x in resultVF.variants if x[0] != '-')
-        self.summary.settext("Potential de novo variants: %d\nWith posterior probability > 50%%: %d" %(resultVF.length, post50))
-        self.filtus.text.prettyPrint(resultVF, rightClick="variantMenu")
-        
-        
-    def _setFreqCols(self):
-        try:
-            useFile = int(self.readIDfield(self.child)[0])
-        except:
-            useFile = 0
-        self.freqMenu.setItems([''] + self.filtus.files[useFile].columnNames)
-            
-    def align(self):
-        Pmw.alignlabels([self.child, self.father, self.mother], sticky='w')
-        Pmw.alignlabels([self.mutEntry, self.freqMenu], sticky='w')      
-        
-    def clear_more(self):
-        self.freqMenu.setvalue('')
         
     
-
 class VCFgenotypeDisplay(Pmw.Dialog):
     def __init__(self, filtus, triodic, vdef, denovoprob):
         VFch, VFfa, VFmo = [filtus.filteredFiles[triodic[x]] for x in ['child', 'father', 'mother']]
@@ -1545,6 +1448,7 @@ class OptionMenuExt(Pmw.OptionMenu):
     def enable(self):
         self.component("menubutton").configure(state = 'normal')
 
+        
 class FileBrowser(Pmw.MegaWidget):
     '''Megawidget containing an entryfield, a 'browse' button, and possibly a checkbutton.
     '''
@@ -1801,6 +1705,7 @@ class GeneLookup(object):
         genes = [g.strip() for g in self.prompt.get().split(',')]
         variants = FiltusAnalysis.geneLookup(genes, VFlist=self.filtus.filteredFiles)
         self.geneViewer.display(variants)
+
         
 class ModelSelect(Pmw.RadioSelect):
     def __init__(self, parent, **kw):
@@ -1817,6 +1722,7 @@ class ModelSelect(Pmw.RadioSelect):
     def getButtons(self):
         return [self.button(i) for i in range(3)]
 
+        
 def makeReadOnly(tkWdg):
     """Makes a Tk widget (typically an Entry or Text) read-only, in the
     sense that the user cannot modify the text (but it can still be set
@@ -2025,10 +1931,7 @@ class AutEx_GUI(Pmw.Dialog):
         return dict(f=f, a=a, error=error, altFreqCol=altFreqCol, defaultFreq=def_freq, 
                     threshold=threshold, minlength=minlength, unit=unit, mincount=mincount)
 
-                    
-                    
-                    
-
+                  
 class PLINK_GUI(Pmw.Dialog):
     def __init__(self, filtus):
         Pmw.Dialog.__init__(self, filtus.parent, buttons = ('Compute','Close'), title = 'Plink homozygosity', defaultbutton=0,
@@ -2072,13 +1975,12 @@ class PLINK_GUI(Pmw.Dialog):
         reset.invoke('Strict ROHs')
         reset.grid(pady=5)
         self.align()
-        
         param_group.grid(ipady=2, **grid_opt)
-        
         
         out = Tkinter.Frame(interior)
         out.columnconfigure(0, weight=1)
         out.columnconfigure(1, weight=1)
+        
         summary_group = Pmw.Group(out, tag_text = 'Summary')
         summary_interior = summary_group.interior()
         self.summary = Pmw.ScrolledText(summary_interior, columnheader=0, #columnheader_padx=2, columnheader_width = 42,
@@ -2102,7 +2004,6 @@ class PLINK_GUI(Pmw.Dialog):
         plot_group.grid(**dict(grid_opt, row=0, column=1))  
         
         out.grid(sticky='news')
-        #Pmw.alignlabels([self.inbreedingOM, self._thresh_entry, self._minlength_entry]) #self.plotCHR, 
         
         for g in [param_group, summary_group, plot_group]:
             g.interior().columnconfigure(0, weight=1)
@@ -2186,3 +2087,146 @@ class PLINK_GUI(Pmw.Dialog):
     def _readInput(self):
         return {param:entry.getvalue().strip() for param, entry in zip(self.paramList, self.entryFields)}
         
+
+class DeNovo_GUI(Pmw.Dialog):
+    def __init__(self, filtus):
+        
+        Pmw.Dialog.__init__(self, filtus.parent, buttons = ('Compute','Close'), title = 'DeNovo', defaultbutton=0,
+            command=self.execute, activatecommand=self._prepare, buttonbox_pady=10, dialogchildsite_pady=10)
+        interior = self.interior()
+        interior.columnconfigure(0, weight=1)
+        
+        self.withdraw()
+        self.filtus = filtus
+        self.denovoComputer = FiltusAnalysis.DeNovoComputer()
+        
+        # Title label
+        Tkinter.Label(interior, text='Detection of de novo variants', font=filtus.titlefont).grid(padx=20, pady=10)
+        
+        entry_opt = dict(entry_width=6, labelpos='w', labelmargin=5, label_anchor='w')
+        grid_opt = dict(padx=10, pady=5, sticky='news')
+        
+        # Parameter input
+        trio_group = Pmw.Group(interior, tag_text = 'Trio samples')
+        trio_interior = trio_group.interior()
+        trio_interior.columnconfigure(0, weight=1)
+        trio_interior.columnconfigure(1, weight=1)
+        trio_interior.columnconfigure(2, weight=1)
+            
+        self.child = Pmw.EntryField(trio_interior, label_text = "Child:", entry_justify="left", **entry_opt)#, modifiedcommand=self._setFreqCols)
+        self.father = Pmw.EntryField(trio_interior, label_text = "Father:", entry_justify="left", **entry_opt)
+        self.mother = Pmw.EntryField(trio_interior, label_text = "Mother:", entry_justify="left", **entry_opt)
+        self.child.grid(row=0, column=0, **grid_opt)
+        self.father.grid(row=0, column=1, **grid_opt)
+        self.mother.grid(row=0, column=2, **grid_opt)
+        
+        mut_group = Pmw.Group(interior, tag_text = 'Mutation rate')
+        mut_interior = mut_group.interior()
+        
+        self.mutEntry = Pmw.EntryField(mut_interior, label_text = "Prior mutation rate:", value="1e-8", entry_justify="center", **entry_opt)
+        self.mutEntry.grid(padx=10, pady=5, sticky='nw')
+        
+        # Frequency input
+        freq_group = Pmw.Group(interior, tag_text = 'Allele frequencies')
+        freq_interior = freq_group.interior()
+        self._altFreqMenu = OptionMenuExt(freq_interior, label_text = "ALT frequency column:", labelpos='nw', 
+                                        menu_font=filtus.defaultfont, menubutton_anchor = 'w', labelmargin=2,
+                                        menubutton_padx=5, menubutton_pady=1, menubutton_width=18)
+        self._def_freq_entry = Pmw.EntryField(freq_interior, label_text = "Missing entry value:", entry_justify="center",
+                                        value='0.1', entry_width=6, labelpos='nw', labelmargin=4)
+        
+        self._altFreqMenu.grid(row=1, column=0, sticky='news', padx=(10,25), pady=(5,10))
+        self._def_freq_entry.grid(row=1, column=1, sticky='nes', padx=10, pady=(5,11))
+        
+        # Output options
+        out_group = Pmw.Group(interior, tag_text = 'Output filters')
+        out_interior = out_group.interior()
+        
+        ALTframe = Tkinter.Frame(out_interior)
+        ALTframe.columnconfigure(0, weight=1)
+        
+        Tkinter.Label(ALTframe, text="Percentage of reads with ALT allele:").grid(rowspan=2, sticky='nsw', padx=(10,5), pady=5)
+        self._minALTchild_entry = Pmw.EntryField(ALTframe, label_text = "Child >", value='30', **entry_opt)
+        self._maxALTparent_entry = Pmw.EntryField(ALTframe, label_text = "Parents <", value='10', **entry_opt)
+        
+        self._minALTchild_entry.grid(row=0, column=1, padx=(0,10), pady=2, sticky='w')
+        self._maxALTparent_entry.grid(row=1, column=1, padx=(0,10), pady=2, sticky='w')
+        Pmw.alignlabels([self._minALTchild_entry, self._maxALTparent_entry], 'e') 
+        ALTframe.grid(columnspan=2, sticky='news')
+        
+        self._thresh_entry = Pmw.EntryField(out_interior, label_text = "Posterior probability >", value='', **entry_opt)#labelpos='nw', labelmargin=4, entry_width=6)
+        self._thresh_entry.grid(padx=10, pady=5, sticky='w')
+        
+        summary_group = Pmw.Group(interior, tag_text = 'Summary')
+        summary_interior = summary_group.interior()
+        self.summary = Pmw.ScrolledText(summary_interior, columnheader=0, text_height=2, text_font=filtus.monofont, text_wrap='none', text_padx=3, text_pady=3,
+                        text_width=50, borderframe=0, scrollmargin=0, vscrollmode='none', hscrollmode='none')
+        makeReadOnly(self.summary.component('text'))
+        self.summary.grid(**grid_opt)
+        
+        #Pmw.alignlabels([self._thresh_entry, self.mutEntry, self._minALTchild_entry, self._maxALTparent_entry]) 
+        Pmw.alignlabels([self.mutEntry, self._thresh_entry]) 
+        
+        for g in [trio_group, mut_group, freq_group, out_group, summary_group]:
+            g.interior().columnconfigure(0, weight=1)
+            g.configure(tag_font = filtus.smallbold)
+            g.grid(ipady=2, **grid_opt)
+        
+    def execute(self, button):
+        if button is None or button=='Close':
+            return self.deactivate()
+        try:
+            filtus = self.filtus
+            filtus.busy()
+            input = self._readInput()
+            result = self.denovoComputer.analyze(**input) 
+            self.summary.settext("%d variants found!\nVariants are shown in the main window." % result.length)
+            filtus.text.prettyPrint(result, rightClick="variantMenu")
+            filtus.notbusy()
+        except Exception as e:
+            filtus.notbusy()
+            FiltusUtils.warningMessage("%s: %s"% (type(e).__name__, e))
+            return
+
+    #### Private methods ###
+    
+    def _prepare(self):
+        VF = self.filtus.checkLoadedSamples(select="all", VF=True, minimum=3)[0]
+        self._altFreqMenu.setItems([''] + VF.columnNames)
+        
+    def _readInput(self):
+        loadedVFs = self.filtus.filteredFiles
+        loadedFilenames = [VF.longName for VF in loadedVFs]
+        ch_fa_mo = []
+        for name, entryfield in zip(['Child', 'Father', 'Mother'], [self.child, self.father, self.mother]):
+            try:
+                entry = entryfield.getvalue().strip()
+                indices = FiltusUtils.convert2indices(entry, idlist=loadedFilenames)
+            except Exception as e:
+                raise ValueError("Invalid %s: %s\n\nDetails:\n%s"%(name.lower(), entry, e))
+            if not indices: # indices is a list, so [0] will pass this.
+                raise ValueError("Invalid %s: Field cannot be empty." % name.lower())
+            if len(indices) > 1:
+                raise ValueError("Invalid %s: Please enter the ID of exactly one individual." % name.lower())    
+            ch_fa_mo.append(indices)
+            
+        FiltusUtils.checkDuplicates(ch_fa_mo)
+        ch_fa_mo_flatten = [a[0] for a in ch_fa_mo]
+        VFch, VFfa, VFmo = [loadedVFs[i] for i in ch_fa_mo_flatten]
+        
+        threshold = float(self._thresh_entry.getvalue()) if self._thresh_entry.getvalue() else None 
+        minALTchild = float(self._minALTchild_entry.getvalue()) if self._minALTchild_entry.getvalue() else None 
+        maxALTparent = float(self._maxALTparent_entry.getvalue()) if self._maxALTparent_entry.getvalue() else None 
+        
+        altFreqCol = self._altFreqMenu.getvalue()
+        def_freq = self._def_freq_entry.getvalue()
+        if not def_freq or not 0 < float(def_freq) < 1: 
+            raise ValueError("Please indicate a 'Missing entry value' strictly between 0 and 1. (This is used as the default allele frequency).")
+        def_freq = float(def_freq)
+        mut = self.mutEntry.getvalue()
+        if not mut or not 0 < float(mut) < 1: 
+            raise ValueError("Please indicate a prior mutation rate strictly between 0 and 1.")
+        mut = float(mut)
+        
+        return dict(VFch=VFch, VFfa=VFfa, VFmo=VFmo, trioID=ch_fa_mo_flatten, mut=mut, altFreqCol=altFreqCol, defaultFreq=def_freq, 
+                    threshold=threshold, minALTchild=minALTchild, maxALTparent=maxALTparent)

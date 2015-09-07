@@ -107,6 +107,7 @@ class QC(object):
         cols = FiltusUtils.listUnique([head for VF in files for head in VF.columnNames])
         for colmenu in [self.scatter_x, self.scatter_y, self.histo_var]:
             colmenu.setItems(['']+cols)
+        
     
     def _browseSave(self):
         fil = tkFileDialog.asksaveasfilename(initialdir=self.filtus.currentDir, title = "Save plot data as")

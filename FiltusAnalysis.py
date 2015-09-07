@@ -4,6 +4,7 @@ import collections
 import itertools
 import re
 import math
+import time
 from operator import itemgetter
 from subprocess import call
 
@@ -539,25 +540,45 @@ class DeNovoComputer(object):
         [m**2, 2*m*n, n**2]]] # BB*BB
         return T
     
-    def analyze(self, VFch, VFfa, VFmo, trioID, mut, defaultFreq, altFreqCol=None, MAFcolumns=None):
+    def analyze(self, VFch, VFfa, VFmo, trioID, mut, defaultFreq, altFreqCol=None, MAFcolumns=None, threshold=None, minALTchild=None, maxALTparent=None):
+        if not 0 < mut < 1: raise ValueError("Prior mutation rate must be between 0 and 1")
+        if not 0 < defaultFreq < 1: raise ValueError("Default allele frequency must be between 0 and 1")
+        
+        for col in ['GT', 'AD', 'PL']:
+            for VF in [VFch, VFfa, VFmo]:
+                if not col in VF.columnNames:
+                    raise ValueError("This analysis requires a '%s' column. This is missing from:\n\n%s" %(col, VF.longName))
+                    
         vardef = VFch.chromPosRefAlt 
-        GT = VFch.columnGetter('GT')
-        chrInt = FiltusUtils.chromInt
+        if vardef is None:
+            raise ValueError("Sorry, I'm having trouble understanding the format. De novo detection is properly tested only with VCF files and Annovar output files.") 
         
-        if vardef is None or GT is None:
-            raise ValueError("Sorry, I'm having trouble understanding the format. This function is still experimental, and properly tested only with VCF files and Annovar output files.") 
-        
-        _REFREF = ("0/0", "0|0", "./.")
-        _HETEROZ = ("0/1", "0|1", "1|0")
-        fa00 = {vardef(v):v for v in VFfa.variants if GT(v) in _REFREF}
-        mo00 = {vardef(v):v for v in VFmo.variants if GT(v) in _REFREF}
-        
-        def parents00(v):
+        def parents00(v, fa00, mo00):
             vdef = vardef(v)
             return vdef in fa00 and vdef in mo00 
-                
-        ch_denovo = {vardef(v):v for v in VFch.variants if GT(v) not in _REFREF and parents00(v)} 
         
+        useGT = minALTchild is None or maxALTparent is None
+        
+        if useGT:
+            _REFREF = ("0/0", "0|0", "./.")
+            _HETEROZ = ("0/1", "0|1", "1|0")
+            GT = VFch.columnGetter('GT')
+            fa00 = {vardef(v):v for v in VFfa.variants if GT(v) in _REFREF}
+            mo00 = {vardef(v):v for v in VFmo.variants if GT(v) in _REFREF}
+            ch_denovo = {vardef(v):v for v in VFch.variants if GT(v) not in _REFREF and parents00(v, fa00, mo00)} 
+        else:
+            AD = VFch.columnGetter('AD')
+            def ALTperc_direct(v, AD):
+                try: 
+                    reads = map(int, AD(v).split(','))
+                    return float(reads[1])/sum(reads)*100
+                except (ValueError, ZeroDivisionError):
+                    return 0.0
+            
+            fa00 = {vardef(v):v for v in VFfa.variants if ALTperc_direct(v, AD) < maxALTparent}
+            mo00 = {vardef(v):v for v in VFmo.variants if ALTperc_direct(v, AD) < maxALTparent}
+            ch_denovo = {vardef(v):v for v in VFch.variants if ALTperc_direct(v, AD) > minALTchild and parents00(v, fa00, mo00)} 
+            
         freq = AlleleFreq(VFch, defaultFreq=defaultFreq, altFreqCol=altFreqCol, MAFcolumns=MAFcolumns, minmax=(0.001, 0.999))
         
         # cannot use freqObject directly because only vdef's are given
@@ -566,7 +587,7 @@ class DeNovoComputer(object):
         else:
             def frq(vdef):
                 return freq(ch_denovo[vdef])
-                
+        
         AD = VFch.columnGetter('AD')
         def AD_getter(vdef):
             return [AD(x[vdef]) if vdef in x else '0,0' for x in (ch_denovo, fa00, mo00)]
@@ -583,6 +604,21 @@ class DeNovoComputer(object):
         meta = FiltusUtils.preambleNY(VFlist=[VFch, VFfa, VFmo], VFindex=trioID, analysis = analys_txt)
         
         resultVF = VFch.copyAttributes(columnNames=heads, variants = denovoPosteriors, filename=None, meta=meta)
+        
+        ### output filters
+        columnfilter = []
+        if threshold is not None:
+            if not 0 <= threshold <= 1: raise ValueError("Posterior probability threshold must be between 0 and 1")
+            columnfilter.append(('P(de novo|data)', 'greater than', threshold, 1))
+        if minALTchild is not None:
+            if not 0 <= minALTchild <= 100: raise ValueError("Minimum child ALT percentage must be between 0 and 100")
+            columnfilter.append(('%ALT child', 'greater than', minALTchild, 1))
+        if maxALTparent is not None:
+            if not 0 <= maxALTparent <= 100: raise ValueError("Maximum parent ALT percentage must be between 0 and 100")
+            columnfilter.extend([('%ALT father', 'less than', maxALTparent, 1), ('%ALT mother', 'less than', maxALTparent, 1)])
+        if columnfilter:
+            resultVF = Filter.Filter(columnfilters=columnfilter).apply(resultVF)
+        
         resultVF.sort(column=heads[0], descending=True)
         return resultVF
         
