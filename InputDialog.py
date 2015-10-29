@@ -504,7 +504,8 @@ class InputDialog(object):
         for i in range(n-1, 1, -1): # shorter to go backwards 
             if not 'format' in lowheads[i]: continue
             k = kolon[i]
-            if all(1 <= kolon[j] <= k or firstvar[j]=='./.' for j in range(i+1, n)):
+            if k==0 and not firstvar[i]=='GT': continue
+            if all(0 <= kolon[j] <= k or firstvar[j]=='./.' for j in range(i+1, n)):
                 infoCol = headers[i-1] if 'info' in lowheads[i-1] else ''
                 formatCol = headers[i]
                 return (True, infoCol, formatCol)

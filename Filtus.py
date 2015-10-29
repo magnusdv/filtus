@@ -1,24 +1,34 @@
 # -*- coding: utf-8 -*-
-from Tkinter import *
+#================================================================
+# FILTUS:  A tool for downstream analysis of variant files
+# See: http://folk.uio.no/magnusv/filtus.html
+#----------------------------------------------------------------
+
+PROGRAM_NAME = "FILTUS"
+VERSION = "0.99-95"
+
+import time
+import Tkinter
 import Pmw
 import tkFont
 import tkFileDialog
-
-#import cProfile
-#import pstats
 
 import gc
 import sys
 import os.path
 from math import copysign
 
+if sys.version_info[:2] != (2,7):
+    print "Python 2.7 is needed to run Filtus. Your Python version is %d.%d.%d" %sys.version_info[:3]
+    sys.exit(0)
+
 import FiltusWidgets
 import FiltusDatabase
 import FiltusAnalysis
 import FiltusUtils
 import InputDialog
-
-# module FiltusQC is imported in a special method - to check availability of numpy and matplotlib.
+    
+# module FiltusQC is imported in a try clause - to check availability of numpy and matplotlib.
 try:
     import FiltusQC
     PLOT_error = None
@@ -26,10 +36,12 @@ except ImportError as e:
     print 'plot import error'
     PLOT_error = e
  
+
 class Filtus(object):
     def __init__(self, parent, version):
         self.parent = parent
         self.version = version
+        parent.title("FILTUS " + version)
         self.busyManager = BusyManager(parent)
         self.windowingsystem = parent.tk.call('tk', 'windowingsystem')
         self.rightclickevents = ['<2>', '<Control-1>'] if self.windowingsystem == 'aqua' else ['<3>']
@@ -68,7 +80,7 @@ class Filtus(object):
         self.storage = {} # storage for  variant databases (to avoid reloading when filtering)
         
         ############## The file group
-        self.fileGroup = Frame(frame)
+        self.fileGroup = Tkinter.Frame(frame)
         self.fileGroup.columnconfigure(0, weight=1)
 
         self.fileListbox = FiltusWidgets.LabeledListBox(self.fileGroup, filtus=self, toptext="Loaded files: 0", width=50)
@@ -114,7 +126,7 @@ class Filtus(object):
                                                     width=min(frame.winfo_width(), frame.winfo_screenwidth()-50))
         self.scrollframe.grid(row=1, sticky='news', padx=20, pady=(10, 20))
         if PLOT_error:
-            FiltusUtils.warningMessage("Plotting functionality is disabled. Error message:\n\n%s\n\nNote: On MAC and Linux the modules 'numpy' and 'matplotlib' must be installed separately to make the plots work.\nSee also Filtus homepage: folk.uio.no/magnusv/filtus.html"%PLOT_error)
+            FiltusUtils.warningMessage("Plotting functionality is disabled. Error message:\n\n%s\n\nNote: On MAC and Linux the modules 'numpy' and 'matplotlib' must be installed separately to make the plots work.\nSee also Filtus homepage: http://folk.uio.no/magnusv/filtus.html"%PLOT_error)
         
              
     def _run(self, event):
@@ -181,7 +193,6 @@ class Filtus(object):
 
     def makeMainMenu(self):
         menuBar = Pmw.MenuBar(self.parent, hull_relief='raised', hull_borderwidth=2)
-        menuBar.grid(row=0, column=0, sticky='ew')
         menuBar.addmenu('File', None)
         menuBar.addmenuitem('File', 'command', None, command=self.browseFiles, label='Load variant files (simple)', font=self.defaultfont)
         menuBar.addmenuitem('File', 'command', None, command=self.advLoad_prompt, label='Load variant files (advanced)', font=self.defaultfont)
@@ -222,6 +233,8 @@ class Filtus(object):
         menuBar.addmenuitem('Analysis', 'separator')
         menuBar.addmenuitem('Analysis', 'command', None, command=self.denovo_prompt, label="De novo variant detection", font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'separator')
+        #menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_pair_prompt, label="Pairwise relatedness", font=self.defaultfont)
+        #menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_trio_prompt, label="Trio relatedness", font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'command', None, command=self.pairwiseSharing, label='Pairwise variant sharing', font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'separator')
         menuBar.addmenuitem('Analysis', 'command', None, command=self.QC_prompt, label='QC plots', font=self.defaultfont) 
@@ -238,6 +251,7 @@ class Filtus(object):
         menuBar.addmenuitem('Settings', 'command', None, command=self.genelengths_prompt, label='Gene lengths', font=self.defaultfont)
         menuBar.addmenuitem('Settings', 'separator')
         menuBar.addmenuitem('Settings', 'command', None, label='Preferences', command=self.settingsPrompt, font=self.defaultfont)
+        menuBar.grid(row=0, column=0, sticky='ew')
         self.menuBar = menuBar
 
     def busy(self):
@@ -314,6 +328,26 @@ class Filtus(object):
         except Exception as e:
             FiltusUtils.warningMessage("%s: %s" %(type(e).__name__, e))
     
+    def relatedness_pair_prompt(self):
+        if not self.checkLoadedSamples(select="all"): return
+        if not hasattr(self, 'relatednessgui'):
+            self.relatednessgui = FiltusWidgets.Relatedness_GUI(self)
+        try:
+            FiltusUtils.activateInCenter(self.parent, self.relatednessgui)
+        except Exception as e:
+            #FiltusUtils.warningMessage("%s: %s" %(type(e).__name__, e))
+            raise
+    
+    def relatedness_trio_prompt(self):
+        if not self.checkLoadedSamples(select="all"): return
+        if not hasattr(self, 'relatedness_trio_gui'):
+            self.relatedness_trio_gui = FiltusWidgets.RelatednessTrio_GUI(self)
+        try:
+            FiltusUtils.activateInCenter(self.parent, self.relatedness_trio_gui)
+        except Exception as e:
+            #FiltusUtils.warningMessage("%s: %s" %(type(e).__name__, e))
+            raise
+        
     def pedwriter_prompt(self):
         if not self.checkLoadedSamples(select="all"):
             return
@@ -598,31 +632,29 @@ class BusyManager(object):
         self.widgets = {}
         self.isBusy = False
 
-v = sys.version_info
-if v[:2] != (2,7):
-    print "Python 2.7 is needed to run Filtus. Your Python version is %d.%d.%d"%v[:3]
-    sys.exit(0)
+root = Pmw.initialise()
+filtus = Filtus(root, version=VERSION)
+#root.mainloop() # moved to bottom of file
 
-root = Tk()
-Pmw.initialise(root)
-filtus = Filtus(root, version="0.99-94")
-root.title("FILTUS " + filtus.version)
 
 if __name__ == "__main__":
     
     printVF = FiltusAnalysis._printVF
-    test_csv = ["C:\\Projects\\FILTUS\\Testfiles\\test%d.csv" %i for i in (1,2)]
-    test_vcf = "C:\\Projects\\FILTUS\\Testfiles\\vcf_example.vcf"
-    triotest = "C:\\Projects\\FILTUS\\Testfiles\\triotest.txt" 
+    test_csv = ["..\\..\\Testfiles\\test%d.csv" %i for i in (1,2)]
+    test_vcf = "..\\..\\Testfiles\\vcf_example.vcf"
+    triotest = "..\\..\\Testfiles\\triotest.txt" 
     
     def test_version():
         '''checks that the correct version number is used when saving output files'''
+        print "Testing version number........",
         import inspect
         a = inspect.getargspec(FiltusUtils.preambleNY) # version number is the last argument of this function
         save_version = a.defaults[-1]
         assert save_version == filtus.version
+        print "ok"
         
     def test_loading():
+        print "Testing file load........",
         filtus.clearAll()
         filtus.loadFiles([test_csv[0]], guess=1, prompt=0, geneCol="")
         assert len(filtus.files) == 1
@@ -638,8 +670,10 @@ if __name__ == "__main__":
         assert len(filtus.files) == 3
         filtus.toggleShortNames()
         assert len(filtus.files) == 3
+        print "ok"
         
     def test_sharing():
+        print "Testing gene sharing........",
         filtus.clearAll()
         filtus.loadFiles(test_csv, guess=1, prompt=0, geneCol="Gene", splitAsInfo="INFO")
         gs, vs = filtus.gs, filtus.vs
@@ -647,9 +681,14 @@ if __name__ == "__main__":
         gs.button.invoke()
         vs.fields[4].setvalue('1,2')
         vs.button.invoke()
-    
+        print "ok"
+        
     def test_denovo():
+        print "Testing de novo........",
         filtus.clearAll()
+        dn = FiltusWidgets.DeNovo_GUI(filtus)
+        dn2 = FiltusAnalysis.DeNovoComputer()
+        
         filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
         dn = FiltusWidgets.DeNovo_GUI(filtus)
         dn._prepare()
@@ -659,15 +698,16 @@ if __name__ == "__main__":
         dn._altFreqMenu.setvalue('1000g2012apr_all')
         dn._def_freq_entry.setvalue('0.1')
         dn.execute("Compute")
-        dn.activate()
-        dn2 = FiltusAnalysis.DeNovoComputer()
+        
         res1 = filtus.text.currentColDat
         ch, fa, mo = filtus.files
         res2 = dn2.analyze(VFch=ch, VFfa=fa, VFmo=mo, trioID=[0,1,2], mut=1e-8, defaultFreq=0.1, altFreqCol='1000g2012apr_all', minALTchild=30, maxALTparent=10)
         assert res1.length == res2.length
         assert all(a[0]==b[0] for a,b in zip(res1.variants, res2.variants))
-    
+        print "ok"
+        
     def test_autex():
+        print "Testing Autex........",
         filtus.clearAll()
         filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
         filtus.fileListbox.selection_set(0)
@@ -680,19 +720,21 @@ if __name__ == "__main__":
         filtus.autexgui.execute("Compute")
         res1 = filtus.text.currentColDat
         
-        autex = FiltusAnalysis.AutExComputer(genmapfile="C:\\Projects\\FILTUS\\DecodeMap_thin.txt")
+        autex = FiltusAnalysis.AutExComputer(genmapfile="example_files\\DecodeMap_thin.txt")
         res2 = autex.autex_segments(filtus.files[0], f=0.01, a=.5, error=0.005, defaultFreq=deffreq, altFreqCol=altfreq, threshold=thresh, minlength=length, unit=unit, mincount=n)
         
         assert res1.length == res2.length
         assert all(a[1]==b[1] for a,b in zip(res1.variants, res2.variants))
         filtus.autozyg_prompt()
+        print "ok"
         
     def test_qc():
+        print "Testing QC........",
         filtus.clearAll()
         filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
         QC = FiltusQC.QC(filtus)
         QC._prepare()
-        QC.save_browser.setvalue("C:\\Projects\\FILTUS\\kast.txt")
+        QC.save_browser.setvalue("..\\..\\kast.txt")
         QC.save_browser.select()
         QC.scatter_x.setvalue("DP")
         QC.scatter_y.setvalue("vcf_qual")
@@ -702,14 +744,18 @@ if __name__ == "__main__":
         QC._histogramButtonExecute()
         filtus.QC = QC
         filtus.QC_prompt()
+        print "ok"
         
     def test_summary():
+        print "Testing summary........",
         filtus.clearAll()
         filtus.loadFiles(test_csv, guess=1, prompt=0, splitAsInfo="INFO")
         summarymenu = filtus.menuBar.component('columnsum-menu')
         summarymenu.invoke(0)
-    
+        print "ok"
+        
     def test_geneloopkup(): #TODO
+        print "Testing gene lookup........",
         filtus.clearAll()
         filtus.loadFiles(test_csv[:1], guess=1, prompt=0, geneCol="Gene", splitAsInfo="")
         variants = FiltusAnalysis.geneLookup(["KIAA1751", "_FOO_"], VFlist=filtus.files)
@@ -718,16 +764,20 @@ if __name__ == "__main__":
         filtus.loadFiles(test_csv, guess=1, prompt=0, geneCol="Gene", splitAsInfo="", prefilter=("do not contain", "_foo_"))
         variants = FiltusAnalysis.geneLookup(["KIAA1751", "_FOO_"], VFlist=filtus.files)
         assert variants.length == 8 == 2*variants.collapse().length
+        print "ok"
         
     def test_advancedload():
+        print "Testing advanced load........",
         filtus.clearAll()
         filtus.advLoad = FiltusWidgets.AdvancedLoad(filtus)
-        filtus.advLoad.dirEntry.setvalue("C:\\Projects\\FILTUS\\Testfiles\\")
+        filtus.advLoad.dirEntry.setvalue("example_files")
         filtus.advLoad.endswithEntry.setvalue(".vcf")
         filtus.advLoad.endswithVar.set(1)
         filtus.advLoad_prompt()
-    
+        print "ok"
+        
     def test_plink():
+        print "Testing plink........",
         filtus.clearAll()
         filtus.loadFiles([triotest], guess=1, prompt=0, keep00=1, splitAsInfo="")
         filtus.fileListbox.selection_set(0)
@@ -735,8 +785,20 @@ if __name__ == "__main__":
         filtus.plinkgui._prepare()
         filtus.plinkgui.execute("Compute")
         filtus.plink_prompt()
-    
-    
+        print "ok"
+        
+    def test_relatedness():
+        print "Testing relatedness........",
+        filtus.clearAll()
+        frCol = "1000g2012apr_all"
+        filtus.loadFiles([triotest], guess=1, prompt=0, keep00=1, splitAsInfo="")
+        prom = filtus.relatedness_trio_gui = FiltusWidgets.RelatednessTrio_GUI(filtus)
+        for s, name in zip(prom.sampleOMlist, reversed(filtus.shortFileNameList[:3])):
+            s.setvalue(name)
+        prom.altFreqMenu.setvalue(frCol)
+        filtus.relatedness_trio_prompt()
+        print "ok"
+        
     if len(sys.argv) > 1 and sys.argv[1].startswith("test"):
         if sys.argv[1] == "test":
             test_denovo()
@@ -753,6 +815,11 @@ if __name__ == "__main__":
         else:
             locals()[sys.argv[1]]()
     
+try:
+    root.mainloop()
+except KeyboardInterrupt:
+    root.destroy()
+except Exception as e:
+    print e
+    root.destroy()
     
-root.mainloop()
-

@@ -457,11 +457,12 @@ class VCFtypeData(VariantData):
         self.isVCFtype = True
         self.keep00 = keep00
         self.formatHeads = formatHeads
-        try:
-            self.refCol = next(h for h in columnNames if h.lower() in ['ref', 'vcf_ref', 'ref_vcf'])
-            self.altCol = next(h for h in columnNames if h.lower() in ['alt', 'vcf_alt', 'Obs'])
+        columns_lower = [h.lower() for h in columnNames]
+        self.refCol = next((h for h in ['REF', 'VCF_REF', 'vcf_ref', 'Ref'] if h in columnNames), None)
+        self.altCol = next((h for h in ['ALT', 'VCF_ALT', 'vcf_alt', 'Alt', 'Obs'] if h in columnNames), None)
+        if self.refCol and self.altCol:    
             self.chromPosRefAlt = self.columnGetter(chromCol, posCol, self.refCol, self.altCol) 
-        except:
+        else:
             FiltusUtils.warningMessage("Unknown REF/ALT columns in %s" %filename)
             self.chromPosRefAlt = self.varDefGetter
         self._mainAttributes = [a for a in self._mainAttributes if not a in ['gtCol', 'homSymbol']] + ['formatHeads', 'splitFormat', 'splitInfo',  'keep00']

@@ -1,0 +1,299 @@
+=========================
+    FILTUS Changelog
+=========================
+
+Version 0.99-95. Date 29.10.2015
+--------------------------------
+
+NEW FEATURES:
+* Improved de novo calling for mutliallelic variants.
+* New boolean parameter "GTonly" in DeNovoComputer.analyze(), indicating whether the GT field alone should decide genotype. If GTonly=False potential false negative variants (based on AD field) will be added. 
+Note: All variants detected with GTonly=True will also be detected with GTonly=False.
+
+
+Version 0.99-94. Date 07.09.2015
+------------------------------
+
+NEW FEATURES:
+* A new feature "Prefilter" replaces the old "Startup filter" in the Input settings dialog. If a prefilter is given, it is applied to each line before processing it (splitting columns a.s.o), making it fast and memory efficient. (In contrast, the old "Startup filter" processed the whole file before applying the filters.)
+By using prefilters you can work with files of virtually any size in Filtus, as long as the prefilter reduces it to a manageable number of variants. Example: Suppose you have a whole-genome variant file, with some annotation indicating the functional type of each variant. A useful prefilter in this case could be: "Keep lines which contain 'exonic OR splice'"
+
+* The de novo detection feature is moved to the Analysis menu, and has more options (including filtering on ALT ratios).
+
+
+Version 0.99-93. Date 19.05.2015
+------------------------------
+
+NEW FEATURES:
+* This is test release after reworking several modules, including many GUI improvements and minor changes. More information to come.
+
+
+Version 0.99-91. Date 10.11.2014
+------------------------------
+
+NEW FEATURES:
+* Some improvements of the autozygosity mapping implementation (AutEx). The user dialog is simplified with two major differences: 1) Instead of giving explicitly the (Leutenegger) parameters "f" and "a" as input, the user now simply indicates if the parental relation is thought to be "Close", "1st-2nd cousins" or "Distant". In most practical cases the results are not sensitive to this input. 2) Instead of having the user specifying a recombination map file, the program automatically uses the file "DecodeMap_thin.txt" located in the "example_files" folder. 
+
+* Meta information is now included in output files when saving the detected autozygous regions ("Save main window content"). This file can then be used in the "Restrict to regions"-filter.
+
+
+Version 0.99-9. Date 10.09.2014
+------------------------------
+
+NEW FEATURES:
+* 'NA' entries are now treated as missing during column filtering (and will therefore be kept if the 'kim' box is checked). This behaviour was already in place for 'greater than' and 'less than' filtering, where all non-numerical entries are treated as missing.
+
+BUG FIXES:
+* NB: A bug in 'Gene sharing family' sometimes gave wrong output if healthy controls were given.
+
+* Wrong order of the 'ALT%' columns in the output of 'de novo' algorithm.
+
+
+Version 0.99-8. Date 25.08.2014
+------------------------------
+NEW FEATURES:
+* Several changes in the autozygosity mapping dialog (this is still work in progress). The user can now specify a genetic map (e.g. the one included in the 'example_files' folder). If not, the uniform map with 1Mb = 1cM is used everywhere.
+
+* When sorting numerical columns, non-numerical entries (typically missing values) are now always placed last, independent of ascending/descending order.
+
+BUG FIXES:
+* The 'de novo' algorithm crashed when encountering missing PL values.
+
+* The previous version crashed on Mac/Linux machines without 'numpy' and 'matplotlib' installed. (These libraries are required only for making plots; everything else should work as normal without them.)
+
+* Fixed a bug in the database 'Search' method.
+
+
+Version 0.99-7. Date 04.07.2014
+------------------------------
+NEW FEATURES:
+* Variant view: By right clicking on a single variant, one can open a separate window showing unfiltered details for this variant in all loaded samples.
+
+* The output of de novo detection has three new columns (after the posterior probability column): The percentage of reads with the ALT allele for the child, father and mother respectively. For a true de novo these are expected to be not too far from 50%, 0% and 0%. (The AD field must be present in the format/genotype columns for this to work.)
+
+BUG FIXES:
+* Meta information was not included in "Save main window content" after "Pairwise sharing" analysis.
+
+* Chromosome names with 'chr'-prefixes (e.g. 'chr1' and 'chrX') should work everywhere, including in the gender estimation plot. I think this has been ok for a while, but somehow didn't make it into the changelog.
+
+
+Version 0.99-6. Date 27.05.2014
+------------------------------
+NEW FEATURES:
+* Autozygosity mapping, based on a hidden Markov model developed by Kristina S. Gjøtterud. Details and explanations to follow.
+
+* Gene and variant filters: Multiple file names are now allowed in these fields. Separate by semicolon.
+
+* Added the possibility of copying the contents of a single column (in the main text window). Available by right-clicking on the column header.
+
+BUG FIXES:
+* Minor cleanups
+
+
+Version 0.99-5. Date 13.05.2014
+------------------------------
+NEW FEATURES:
+* A user friendly database GUI replaces the old database functions. The four main functions are 1) New database creation, 2) Adding samples to a database, 3) Extracting subsets of a database, 4) Searching a database for specific variants.
+Importantly, the database formats are slightly changed from the previous version. The simple format has 6 columns: CHROM, POS, OBS = #number of samples with the variant, HET = #heterozygous observations, HOM = #homozygous observations, AFREQ = allele frequency = (HET + 2*HOM) / total number of samples
+The extended format has the same 6 columns, succeeded by one column for each sample, indicating the alternative allele count (0, 1 or 2) for each variant.
+
+* General column splits: In the Input settings dialog, one can now indicate up to 2 columns with associated separators. For example, if the AD field in a VCF file is split on "," (comma), it will be replaced by columns AD_1, AD_2, ... .
+
+OTHER:
+* The layout of the "Input settings dialog" is slightly changed, to reflect some necessary changes in the internal file reading process. The most significant change is the Genotype format choice. The "VCF format" should be checked if the file has a VCF-like genotype format (i.e. a format column followed by individual sample columns) even if the file itself is not a vcf file. Examples of this include typical output from the Annovar annotation software.
+
+* Toggle between long and short display of loaded sample names.
+
+* Removed the automatic naming in VCF-like files lacking sample names. Instead the filename itself is used as sample name, and an error is raised if the file appear to have more than one sample.
+
+* GUI appearance: Replaced the word "file" by "sample" many places, e.g. "Loaded samples".
+
+BUG FIXES:
+* Gene files with non-Windows end-of-line characters caused crashes.
+
+* The VCF preamble reader was too simplistic, hindering files from loading in some cases. 
+
+
+Version 0.99-4. Date 14.02.2014
+------------------------------
+NEW FEATURES:
+* New option "Write data to text file" in the QC plot dialog window. If this is checked, then after plotting the user is prompted for a file name, and the point coordinates are saved to this file. The usual meta information is included (if not unchecked in the "Preferences menu").
+This file can be useful for identification of points in the plots when plotting many samples, which disables the legend.
+
+OTHER:
+* When loading VCF- or VCF-like files with several genotype columns, the sample names (e.g. in the "Loaded samples" window) are displayed as "filename_sample". For example, in "vcf_example.vcf" (included in the example files folder) the header of the first genotype column is "NA00001", resulting in the name "example_files\vcf_example.vcf_NA00001". If the genotype columns lack names, then "sample1", "sample2" a.s.o are inserted.
+
+* More informative error messages in QC plots.
+
+BUG FIXES:
+* The "Gender estimation" plot (one of the QC plots) erroneously included variants in the pseudoautosomal regions PAR1 (60001-2699520) and PAR2 (154931044-155270560) on X. These are now removed before calculating heterozygosity on X.
+
+
+Version 0.99-3. Date 01.02.2014
+------------------------------
+NEW FEATURES:
+* De novo analysis for trios. This analysis requires a single variant file containing genotype data on the child and both parents. The file does not need to be in VCF format, but the genotype columns must be in VCF style, e.g. a FORMAT column followed by the individual genotype columns. The GT and PL fields must be present. When loading the file, make sure to split the FORMAT column, and to check the "Keep 0/0" box. 
+
+The algorithm identifies variants where the child is called heterozygous and both parents homozygous for the REF allele. The genotype likelihoods in the PL column are then combined with user specified info on allele frequencies and prior mutation rate, in a bayesian computation giving a posterior probability for each variant of being de novo.
+
+OTHER:
+* Improved handling of variant files in VCF and VCF-like formats (e.g. Annovar output files with original VCF columns attached after the annotation columns.) When a FORMAT column with corresponding genotype column(s) is recognized, the genotype column is automatically set to "VCF format" and interpreted as such.
+
+BUG FIXES:
+* Scroll bars didn't show properly in some situations
+
+
+Version 0.99-2. Date 01.11.2013
+------------------------------
+NEW FEATURES:
+* QC plots: The main new feature in this version is a plotting functionality. This imports matplotlib and numpy, making the windows version of Filtus quite a bit larger. (Note: For Mac and Linux, these libraries must be installed on the system for the plotting to work.) Several types of QC-motivated and exploratory plots are offered. To get a quick overview of a batch of exome sequences it is useful to plot heterozygosity levels, private variants and gender estimation. These can also be compared with an inhouse database of other similar samples. In addition the user can produce histograms or scatter plots of numerical columns in the files. 
+
+
+Version 0.99-1. Date 09.10.2013
+------------------------------
+BUG FIXES:
+* Column filters in start-up filters didn't work properly in the last version.
+
+* Loading of variant exclusion databases was unnecessarily repeated.
+
+* Memory leak fixed.
+
+
+Version 0.99-0. Date 04.10.2013
+------------------------------
+NEW FEATURES:
+* New option in the Filter menu: Individual filtering. Up to 4 different filter configuration files can be applied to specified individuals. (Experimental, needs more testing.)
+
+* Meta information in output files. By default, a preamble is included in the beginning of all output files, with information on the samples, filters and analysis involved. Can be switched off in the Preferences menu.
+
+
+Version 0.98-2. Date 04.09.2013
+------------------------------
+NEW FEATURES:
+* VCF files: If the file contains descriptions of fields in the FILTER, INFO and FORMAT columns, these descriptions are now read by FILTUS and available when the file content is displayed in the main window. Right click on a column header and choose "Description". If the "Description" item is inactive or not present, the column does not have a description. 
+
+OTHER:
+* Fixed font sizes in several menus.
+
+BUG FIXES:
+* Several minor bug fixes.
+
+
+Version 0.98-1. Date 22.08.2013
+------------------------------
+NEW FEATURES:
+* Drop-down menus with more than 25 column names are now split across several columns.
+
+
+Version 0.98. Date 22.08.2013
+-----------------------------
+NEW FEATURES:
+* Added the possibility of truncating columns in the main display. The default maximum width is set to 50 characters, but can be can be changed in the Preferences menu. If set to 0, no truncating is done.
+NOTE: Truncation of wide columns does not affect the output of "Save main window content".
+NOTE: When working with files with very long lines (e.g. many thousand characters wide) truncation is highly recommended.
+
+
+Version 0.97. Date 14.08.2013
+-----------------------------
+NEW FEATURES:
+* Improved handling of VCF files. Several samples in one file are now allowed. 
+
+* Rewritten and simplified the input settings dialog. In particular, variants are (for now, may extend this later)
+always defined by chromosome and position. The names of the columns containing this info must always be indicated.
+
+
+Version 0.95. Date 20.06.2013
+-----------------------------
+NEW FEATURES:
+* Improved region filtering: Regions can now we written directly in the 'Restrict to regions' field, in the format chr:from-to. Use semicolon as separator if more than one region. For example, the region filter 1:0-100; X:200-300
+will extract all variants on chromosome between positions 0 and 100, and on the X chromosome between pos 200 and 300.
+
+
+Version 0.94. Date 20.05.2013
+-----------------------------
+NEW FEATURES:
+* New filter element: 'Restrict to regions'. This requires a separate text file with one row for each region, and three tab (or space) separated columns: chromosome, start, end. NB: Chromosome numbers must be written as in the variant files.
+
+* New column operators 'starts with' and 'does not start with'.
+
+* When loading a file, a warning is displayed if there are no homozygous variants. (This may happen if a wrong symbol of homozygosity is given in the input settings dialog.)
+
+* More informative output of 'Pairwise sharing'. In addition to variant sharing in absolute numbers, I've added a second matrix showing the results in percentages: The entry (i,j) is the percentage of variants in sample 'i' that are also found in sample 'j'. Note that this is in general not a symmetrical matrix.
+
+* 'Build database' now offers two alternatives: Simple or extended format. The simple format is as before, with five columns (chromosome, position, #samples total, #heterozygous, #homozygous). The extended format has one column per sample, with entries 0 (not present), 1 (heterozygous), 2 (homozygous). 
+Note: Legal/ethical issues may conflict with using/distributing databases of human data in extended format.
+
+* New function 'Add to database', which adds the variants of the selected files to an existing database. The function recognizes if the database is in simple or extended format. The updated database is sorted and saved in a separate file with a suffix '_new'. (E.g. if the existing file was named spam.txt, the new file will be spam_new.txt.
+
+* The database functions deal differently with repeated variant positions within a single sample. If several variants have the same position, they are counted only once: As homozygous if any of them are, otherwise heterozygous.
+
+BUG FIXES:
+* Gene lengths (and therefore p-values in 'Gene sharing' analysis) were incorrectly handled in some cases where the 'Exclude genes' filter was switched on and then off.
+
+* Right click menus didn't show on some Mac systems. Fixed now I think.
+
+OTHER:
+* Improved and tightened layout of the filter box.
+
+* Changed to mono-spaced font in all entry fields. (Same font but one point larger than in main text field. Subject to change.) 
+
+* In 'Preferences': Added possibility to change the general font size.
+
+
+Version 0.93. Date 06.05.2013
+-----------------------------
+NEW FEATURES:
+* Export to MERLIN format. The 'File' menu has an entry for exporting selected files to MERLIN format (ped/map/dat). 
+Note: Pedigrees are not implemented in FILTUS yet. Thus the pedigree part (first 6 columns) of the pedfile must be manually edited afterwards.
+
+BUG FIXES:
+* The 'Build database' function: If a variant occurs more than once within a file, only the first occurrence is used.
+
+* Minor fixes and improvements.
+
+
+Version 0.92. Date 08.03.2013
+-----------------------------
+BUG FIXES:
+* Fixed bug in the 'Summarize column' function, which couldn't handle certain cases with empty variant files and/or files missing the indicated column.
+
+
+Version 0.91. Date 07.03.2013
+-----------------------------
+NEW FEATURES:
+* The 'Summarize column' function now gives a sensible summary of numerical columns, including the minimum, maximum and mean of the non-missing entries. If the total number of unique entries is less than 25, the column is treated as categorical.
+
+BUG FIXES:
+* Partly rewritten the file loading methods, motivated by a bug (ØB) which sometimes caused crash when loading several files with non-default parameters. 
+
+* Fixed minor bug in the 'Table' function
+
+OTHER:
+* Faster file loading in 'do-nothing' cases, i.e. where no columns are to be split or deleted, and no startup filters are applied.
+
+
+Version 0.90. Date 01.03.2013
+-----------------------------
+NEW FEATURES:
+* In the file loading dialog, users can now specify the code for homozygous variants. (In earlier versions this was hard-coded to '1/1' as in VCF format files.) Variants with any other entry in the genotype column are interpreted as heterozygous.
+
+* All entry-fields which expect file numbers (e.g. the Cases and Controls in 'Gene sharing' analysis) now accept inputs of the form 'ID <id1>, <id2>, ...', where each of the words <id1>, <id2>, ... uniquely identifies a file name. Furthermore, entries of the form 'NOT ID <id1>, ...' selects all files except those identified by <id1>, ... . 
+Example: If the loaded files are 'C:\myfoo.csv', 'C:\foo2.csv', 'C:\bar.csv' and 'C:\bar2.csv', the following entries will all select files 1, 2 and 3:
+   '1, 2, 3'
+   '1-3'
+   'NOT 4'
+   'ID foo.csv, foo2.csv, bar.csv'
+   'ID my, o2, r.'
+   'NOT ID bar2'
+
+BUG FIXES:
+* Fixed bug in 'Gene sharing family' with compound heterozygous model: Sometimes the results would include genes with a single heterozygous variant.
+
+* Improved handling of non-variant files
+
+* Improved error handling to avoid crashes with bad file types
+
+* Fixed an error in the output of the 'Table' function in 'Variant sharing'
+
+OTHER:
+* Substantially faster filtering in many cases, due to the internal order in which the filters are performed

@@ -19,7 +19,7 @@ def activateInCenter(parent, widget):
     y = offy + height/8
     return widget.activate(geometry='+%d+%d' %(x, y))
 
-def preambleNY(VFlist=None, VFindex=None, sort=True, analysis=None, appendTo=None, version='0.99-94'):
+def preambleNY(VFlist=None, VFindex=None, sort=True, analysis=None, appendTo=None, version='0.99-95'):
     txt = '###############################################################\n' \
           '####  FILTUS %s, analysis performed %s  ####\n' \
           '###############################################################\n' \

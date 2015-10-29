@@ -157,9 +157,10 @@ class DatabaseWidget(Pmw.MegaToplevel):
         self.filtus = filtus
         Pmw.MegaToplevel.__init__(self, filtus.parent, master=filtus.parent, title="Variant databases", activatecommand=self._prepare)
         self.withdraw()
-        self.interior().columnconfigure(0, weight=1)
-        self.interior().rowconfigure(0, weight=1)
-        self.notebook = Pmw.NoteBook(self.interior())
+        interior = self.interior()
+        interior.columnconfigure(0, weight=1)
+        interior.rowconfigure(0, weight=1)
+        self.notebook = Pmw.NoteBook(interior)
         self.notebook.add("New database", page_pyclass=DBpage_new, page_filtus=filtus, page_notebook=self)
         self.notebook.add("Add samples", page_pyclass=DBpage_add, page_filtus=filtus, page_notebook=self)
         self.notebook.add("Extract subset", page_pyclass=DBpage_extract, page_filtus=filtus, page_notebook=self)

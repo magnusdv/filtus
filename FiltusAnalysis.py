@@ -526,6 +526,7 @@ class DeNovoComputer(object):
         pass
         
     def _transm(self, m):
+        if not 0 < m < 1: raise ValueError("Prior mutation rate must be between 0 and 1")
         n = 1-m
         T = [[[n**2, 2*m*n, m**2], # AA*AA
         [.5*n, .5, .5*m], # AA*AB
@@ -540,124 +541,147 @@ class DeNovoComputer(object):
         [m**2, 2*m*n, n**2]]] # BB*BB
         return T
     
-    def analyze(self, VFch, VFfa, VFmo, trioID, mut, defaultFreq, altFreqCol=None, MAFcolumns=None, threshold=None, minALTchild=None, maxALTparent=None):
-        if not 0 < mut < 1: raise ValueError("Prior mutation rate must be between 0 and 1")
-        if not 0 < defaultFreq < 1: raise ValueError("Default allele frequency must be between 0 and 1")
-        
-        for col in ['GT', 'AD', 'PL']:
-            for VF in [VFch, VFfa, VFmo]:
-                if not col in VF.columnNames:
-                    raise ValueError("This analysis requires a '%s' column. This is missing from:\n\n%s" %(col, VF.longName))
-                    
-        vardef = VFch.chromPosRefAlt 
-        if vardef is None:
-            raise ValueError("Sorry, I'm having trouble understanding the format. De novo detection is properly tested only with VCF files and Annovar output files.") 
-        
-        def parents00(v, fa00, mo00):
-            vdef = vardef(v)
-            return vdef in fa00 and vdef in mo00 
-        
-        useGT = minALTchild is None or maxALTparent is None
-        
-        if useGT:
-            _REFREF = ("0/0", "0|0", "./.")
-            _HETEROZ = ("0/1", "0|1", "1|0")
-            GT = VFch.columnGetter('GT')
-            fa00 = {vardef(v):v for v in VFfa.variants if GT(v) in _REFREF}
-            mo00 = {vardef(v):v for v in VFmo.variants if GT(v) in _REFREF}
-            ch_denovo = {vardef(v):v for v in VFch.variants if GT(v) not in _REFREF and parents00(v, fa00, mo00)} 
+    def _REFREFchecker(self, GTonly, includeMissing, GT=None, AD=None, minREFperc=None):
+        _REFREF = ("0/0", "0|0", "./.") if includeMissing else ("0/0", "0|0")
+        if GTonly:
+            def _f(v): return GT(v) in _REFREF
         else:
-            AD = VFch.columnGetter('AD')
-            def ALTperc_direct(v, AD):
-                try: 
-                    reads = map(int, AD(v).split(','))
-                    return float(reads[1])/sum(reads)*100
-                except (ValueError, ZeroDivisionError):
-                    return 0.0
-            
-            fa00 = {vardef(v):v for v in VFfa.variants if ALTperc_direct(v, AD) < maxALTparent}
-            mo00 = {vardef(v):v for v in VFmo.variants if ALTperc_direct(v, AD) < maxALTparent}
-            ch_denovo = {vardef(v):v for v in VFch.variants if ALTperc_direct(v, AD) > minALTchild and parents00(v, fa00, mo00)} 
-            
-        freq = AlleleFreq(VFch, defaultFreq=defaultFreq, altFreqCol=altFreqCol, MAFcolumns=MAFcolumns, minmax=(0.001, 0.999))
-        
-        # cannot use freqObject directly because only vdef's are given
-        if freq.type == "BASIC":
-            def frq(vdef): return defaultFreq
-        else:
-            def frq(vdef):
-                return freq(ch_denovo[vdef])
-        
-        AD = VFch.columnGetter('AD')
-        def AD_getter(vdef):
-            return [AD(x[vdef]) if vdef in x else '0,0' for x in (ch_denovo, fa00, mo00)]
-
-        PL = VFch.columnGetter('PL')
-        def PL_getter(vdef):
-            return [PL(x[vdef]) if vdef in x else '0,0,0' for x in (ch_denovo, fa00, mo00)]
-        
-        denovoPosteriors = self.evaluate(ch_denovo, AD_getter, PL_getter, mut, frq)
-        heads = ['P(de novo|data)', '%ALT child', '%ALT father', '%ALT mother'] + VFch.columnNames
-        
-        analys_txt = "DE NOVO\n## Child: %d\n## Father: %d\n## Mother: %d\n" % tuple(i+1 for i in trioID)
-        analys_txt += "## Mutation rate: %g\n## %s" % (mut, str(freq))
-        meta = FiltusUtils.preambleNY(VFlist=[VFch, VFfa, VFmo], VFindex=trioID, analysis = analys_txt)
-        
-        resultVF = VFch.copyAttributes(columnNames=heads, variants = denovoPosteriors, filename=None, meta=meta)
-        
-        ### output filters
-        columnfilter = []
-        if threshold is not None:
-            if not 0 <= threshold <= 1: raise ValueError("Posterior probability threshold must be between 0 and 1")
-            columnfilter.append(('P(de novo|data)', 'greater than', threshold, 1))
-        if minALTchild is not None:
-            if not 0 <= minALTchild <= 100: raise ValueError("Minimum child ALT percentage must be between 0 and 100")
-            columnfilter.append(('%ALT child', 'greater than', minALTchild, 1))
-        if maxALTparent is not None:
-            if not 0 <= maxALTparent <= 100: raise ValueError("Maximum parent ALT percentage must be between 0 and 100")
-            columnfilter.extend([('%ALT father', 'less than', maxALTparent, 1), ('%ALT mother', 'less than', maxALTparent, 1)])
-        if columnfilter:
-            resultVF = Filter.Filter(columnfilters=columnfilter).apply(resultVF)
-        
-        resultVF.sort(column=heads[0], descending=True)
-        return resultVF
-        
+            default = 100 if includeMissing else 0
+            _ADperc = self._ADperc
+            def _f(v): return (GT(v) in _REFREF) or (_ADperc(AD(v), alleleNum=0, default=default) > minREFperc)
+        return _f
     
-    def evaluate(self, ch, AD_getter, PL_getter, mut, frq):
-        TR = self._transm(mut)
-        pow, log10 = math.pow, math.log10
-        pl2loglik = self.pl2loglik
-        cartprod012 = [(f,m,c) for f in range(3) for m in range(3) for c in range(3)]      
+    def _ADperc(self, ADfield, alleleNum, default=0.0):
+        '''Input: AD field (string), alleleNum (integer or list of integers). 
+        Output: Percentage of reads with the specified allele numbers.'''
+        try: 
+            reads = map(int, ADfield.split(','))
+            if isinstance(alleleNum, list):
+                return sum(float(reads[num]) for num in alleleNum)/sum(reads)*100
+            else:
+                return float(reads[alleleNum])/sum(reads)*100
+        except (ValueError, ZeroDivisionError):
+            return default
+        except Exception as e:
+            print e
+            return default
+            
+    def _incompatibleAllele(self, v_child, v_fa, v_mo, alleleGetter):
+        '''
+        Example 1: Child=2/2, Father=0/1, mother=1/2 --> 2
+        Example 2: Child=1/2, Father=0/0, mother=0/0 --> [1,2]
+        '''
+        al_ch, al_fa, al_mo = alleleGetter(v_child), alleleGetter(v_fa), alleleGetter(v_mo)
+        if al_ch in [al_fa, al_mo]:
+            return None #if child's genotype equals either parent, then defined to be benign
+        compatible = (al_ch[0] in al_fa and al_ch[1] in al_mo) or (al_ch[0] in al_mo and al_ch[1] in al_fa)
+        if compatible:
+            return None
+        unseen = [x for x in sorted(set(al_ch)) if x not in al_fa and x not in al_mo]
+        if len(unseen) == 1: 
+            return int(unseen[0])
+        elif len(unseen) == 2: 
+            return [int(unseen[0]), int(unseen[1])] # coding as single numeric (assuming < 10 alleles!)
         
-        def computePosterior(PLstrings, b):    
-            try:
-                glc, glf, glm = [pl2loglik(pl) for pl in PLstrings]  #convert PL's to logliks
-                loga, logb = log10(1-b), log10(b)
-                logHW = (2*loga, log10(2)+loga+logb, 2*logb) #(1-b)^2,2*(1-b)*b, b^2)
-                logliks = [glf[f] + glm[m] + glc[c] + logHW[f] + logHW[m] + log10(TR[f][m][c]) for f,m,c in cartprod012]
-                postprob = pow(10, logliks[1])/sum(pow(10, ll) for ll in logliks) #logliks[1] corresponds to (0,0,1), i.e. de novo.
-                return '%.5f'%postprob
-            except Exception as e:
-                return '-'
-                
-        def ALTpercent(ad):
-            try: 
-                reads = map(int, ad.split(','))
-                perc = float(reads[1])/sum(reads)*100
-                return '%.1f'% perc
-            except (ValueError, ZeroDivisionError):
-                return '-'
-            except AttributeError: # if ad is a tuple or list!
-                return tuple(ALTpercent(a) for a in ad)
-                
-        return [(computePosterior(PL_getter(vdef), frq(vdef)), ) + ALTpercent(AD_getter(vdef)) + v for vdef,v in ch.iteritems()]
-    
+        if (al_ch[0] in al_fa and al_ch[1] not in al_mo) or (al_ch[0] in al_mo and al_ch[1] not in al_fa):
+            return int(al_ch[1])
+        return int(al_ch[0])
+            
+    def PL2postprob(self, PLch, PLfa, PLmo, TRmatrix, bfrq):    
+        '''Only works for diallelic variants (easy to generalize, but need frequencies for all alleles)'''
+        log10, pow = math.log10, math.pow
+        try:
+            glc, glf, glm = map(self.pl2loglik, (PLch, PLfa, PLmo))  #convert PL's to logliks
+            if len(glc) > 3: raise RuntimeError("Only works for diallelic variants")
+            loga, logb = log10(1-bfrq), log10(bfrq)
+            logHW = (2*loga, log10(2)+loga+logb, 2*logb) #(1-b)^2,2*(1-b)*b, b^2)
+            logliks = [glf[f] + glm[m] + glc[c] + logHW[f] + logHW[m] + log10(TRmatrix[f][m][c]) for f in range(3) for m in range(3) for c in range(3)]
+            postprob = pow(10, logliks[1])/sum(pow(10, ll) for ll in logliks) #logliks[1] corresponds to (0,0,1), i.e. de novo.
+        except Exception as e:
+            postprob = None
+        return postprob
+        
     def pl2loglik(self, PL):
         '''converts PL string to true logliks of AA, AB, BB'''
         pl10 = [-float(a)/10 for a in PL.split(',')]
         logRdenom = math.log1p(sum(math.pow(10, x) for x in pl10 if x < 0))/math.log(10)
         return [y - logRdenom for y in pl10]
         
+    def analyze(self, VFch, VFfa, VFmo, trioID, mut, defaultFreq, altFreqCol=None, MAFcolumns=None, threshold=None, GTonly=None, minALTchild=None, maxALTparent=None, includeMissing=False):
+        #### Checking input data
+        if not 0 < defaultFreq < 1: raise ValueError("Default allele frequency must be between 0 and 1")
+        if threshold is not None and not 0 <= threshold <= 1: raise ValueError("Posterior probability threshold must be between 0 and 1")
+        if minALTchild is not None and not 0 <= minALTchild <= 100: raise ValueError("Minimum child ALT percentage must be between 0 and 100")
+        if maxALTparent is not None and not 0 <= maxALTparent <= 100: raise ValueError("Maximum parent ALT percentage must be between 0 and 100")
+        if GTonly is True and (minALTchild is None or maxALTparent is None):
+            raise RunTimeError("When 'GTonly' is False, both parameters 'minALTchild' and 'maxALTparent' must be specified (between 0 and 100).") 
+        if VFch.chromPosRefAlt is None: raise ValueError("The input file format is not VCF-like.") 
+        for col in ['GT', 'AD', 'PL']:
+            for VF in [VFch, VFfa, VFmo]:
+                if not col in VF.columnNames: 
+                    raise ValueError("This analysis requires a '%s' column. This is missing from:\n\n%s" %(col, VF.longName))
+        
+        #### Setup
+        if GTonly is None: GTonly = (minALTchild is None or maxALTparent is None)
+        
+        TRmatrix = self._transm(mut)
+        freq = AlleleFreq(VFch, defaultFreq=defaultFreq, altFreqCol=altFreqCol, MAFcolumns=MAFcolumns, minmax=(0.001, 0.999))
+        
+        vardef = VFch.chromPosRefAlt 
+        GT, AD, PL = [VFch.columnGetter(x) for x in ('GT', 'AD', 'PL')]
+        _isREFREF = self._REFREFchecker(GTonly, includeMissing, GT=GT, AD=AD, minREFperc=(100 - maxALTparent if maxALTparent else None))
+        
+        item02 = itemgetter(0,2) # used to extract alleles from genotype, e.g. '0/1' -> ('0', '1')
+        def _alleles(v): return sorted(item02(GT(v)))
+        def _multiallelic(v): return ',' in vardef(v)[3]
+        
+        pow, log10 = math.pow, math.log10
+        _ADperc, _incompatibleAllele = self._ADperc, self._incompatibleAllele
+        PL2postprob = self.PL2postprob
+        
+        #### Actual computations
+        # Variants where both parents are REF/REF - or variant is multiallelic
+        fa00 = {vardef(v):v for v in VFfa.variants if _isREFREF(v) or _multiallelic(v)}
+        mo00 = {vardef(v):v for v in VFmo.variants if _isREFREF(v) or _multiallelic(v)}
+        both00 = set(fa00) & set(mo00)
+        denovo = []
+        
+        for v in VFch.variants:
+            vdef = vardef(v)
+            if vdef not in both00 or _isREFREF(v): continue
+            v_fa, v_mo = fa00[vdef], mo00[vdef]
+            
+            if ',' in vdef[3]: #multiallelic!
+                alleleNum = _incompatibleAllele(v, v_fa, v_mo, alleleGetter=_alleles)
+                if not alleleNum: continue
+            else:
+                alleleNum = 1
+            ALTch = _ADperc(AD(v), alleleNum, default=0)
+            if minALTchild and ALTch < minALTchild: continue
+            ALTfa = _ADperc(AD(v_fa), alleleNum, default=0)
+            ALTmo = _ADperc(AD(v_mo), alleleNum, default=0)
+            if maxALTparent and (ALTfa > maxALTparent or ALTmo > maxALTparent): continue
+            
+            post = PL2postprob(PLch=PL(v), PLfa=PL(v_fa), PLmo=PL(v_mo), TRmatrix=TRmatrix, bfrq=freq(v))
+            if post is not None:
+                if threshold and post < threshold: continue
+                post_txt = '%.4f'%post
+            else:
+                post_txt = '-'
+            
+            denovo.append((post_txt, '%.1f'% ALTch, '%.1f'% ALTfa, '%.1f'% ALTmo) + v)
+        
+        heads = ['P(de novo|data)', '%ALT child', '%ALT father', '%ALT mother'] + VFch.columnNames
+        
+        analys_txt = "DE NOVO\n## Child: %d\n## Father: %d\n## Mother: %d\n" % tuple(i+1 for i in trioID)
+        analys_txt += "## Mutation rate: %g\n## %s" % (mut, str(freq))
+        meta = FiltusUtils.preambleNY(VFlist=[VFch, VFfa, VFmo], VFindex=trioID, analysis = analys_txt)
+        
+        resultVF = VFch.copyAttributes(columnNames=heads, variants = denovo, filename=None, meta=meta)
+        resultVF.sort(column=heads[0], descending=True)
+        return resultVF
+        
+   
     #def PL(liks):
     #    '''Convert true likelihoods (sum 1) to normalized phred-scaled PL values'''
     #    x,y,z = [-10*math.log10(y) for y in liks]
@@ -885,12 +909,9 @@ class AutExComputer(object):
         res = []
         prev = 0
         for i,b in enumerate(boo):
-            if prev == b:
-                pass
-            elif b:
-                start = i
-            else:
-                res.append([start, i-1])
+            if prev == b: pass
+            elif b: start = i
+            else: res.append([start, i-1])
             prev = b
         if prev:
             res.append([start, i])
@@ -971,6 +992,8 @@ class AutExComputer(object):
                       "Total MB":totMB, "Total CM":totCM, "Longest MB*":maxMB_ext, "Longest CM*":maxCM_ext, "Longest MB":maxMB, "Longest CM":maxCM}
         return result
         
+       
+
         
 def _printVF(VF, truncate=10):        
     pretty = VF.printData(trunc=truncate)
@@ -982,16 +1005,16 @@ if __name__ == "__main__":
     
     import VariantFileReader
     reader = VariantFileReader.VariantFileReader()
-
-    vcftest = "C:\\Projects\\FILTUS\\Testfiles\\vcf_example2.vcf"
-    vflist = reader.readVCFlike(vcftest, sep="\t", chromCol="CHROM", posCol="POS", geneCol="Gene_INFO", splitAsInfo="INFO", keep00=1)
-    vf = vflist[0]
-    print vf.length 
     
-    gs = GeneSharingComputer(None)
-    share = gs.analyze(vflist[:2], vflist[2:], model="Dominant", family=False, VFcases_index=(0,1), minSampleCount=1)
-    _printVF(share)
-    share_var = share.variantsInGenes(genes=None).collapse()
-    _printVF(share_var)
-    share_var.save("kast2.txt")
+    def test_denovo():
+        test = "example_files\\multiallelic_tests.vcf"; frqCol=""; ch_fa_mo=[0,1,2]
+        vflist = reader.readVCFlike(test, sep="\t", chromCol="CHROM", posCol="POS", geneCol="", splitAsInfo="INFO", keep00=1)
+        VFch, VFfa, VFmo = [vflist[i] for i in ch_fa_mo] 
+        dn = DeNovoComputer()
+        res1 = dn.analyze(VFch, VFfa, VFmo, trioID=ch_fa_mo, mut=1e-8, defaultFreq=.1, altFreqCol=frqCol, GTonly=None, minALTchild=30, maxALTparent=10, includeMissing=0)
+        _printVF(res1)
+        res2 = dn.analyze(VFch, VFfa, VFmo, trioID=ch_fa_mo, mut=1e-8, defaultFreq=.1, altFreqCol=frqCol, GTonly=1, minALTchild=30, maxALTparent=10, includeMissing=1)
+        _printVF(res2)
+        
+    test_denovo()
     
