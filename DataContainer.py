@@ -507,10 +507,33 @@ class VCFtypeData(VariantData):
         gt = self.columnGetter(self.gtCol)
         def _f(v):
             g = gt(v)
-            return 0 != g[0] == g[2]
+            return 0 != g[0] == g[2] != '.'
         return _f    
         
+    def homAllele(self): # returns the allele of homozygous variants - or '-1' if not homozygous.
+        gt = self.columnGetter(self.gtCol)
+        def _f(v):
+            g = gt(v)
+            return g[0] if g[0] == g[2] != '.' else '-1'
+        return _f  
     
+    def alleles(self, actualAlleles=False): # splits the GT field and returns the observed allele pair: GT="0/1" -> ("0", "1")
+        gt = self.columnGetter(self.gtCol)
+        if actualAlleles:
+            ref = self.columnGetter(self.refCol)
+            alt = self.columnGetter(self.altCol)
+            def _f(v):
+                g = gt(v)
+                try:
+                    als = [ref(v)] + alt(v).split(',')
+                    return (als[int(g[0])], als[int(g[2])])
+                except Exception as e:
+                    return ('.', '.')
+        else:
+            def _f(v):
+                g = gt(v)
+                return (g[0], g[2])
+        return _f  
 
 class MultiFileData(VariantData):
     def __init__(self, parent, variants, genes, meta=''):
@@ -547,7 +570,7 @@ class MultiFileData(VariantData):
         gt = self.columnGetter(self.gtCol)
         def _f(v):
             g = gt(v)
-            return 0 != g[0] == g[2]
+            return 0 != g[0] == g[2] != '.'
         return _f    
         
     def copyAttributes(self, variants=None):

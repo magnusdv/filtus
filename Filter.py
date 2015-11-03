@@ -3,6 +3,7 @@ import FiltusWidgets
 import VariantFileReader
 import itertools
 import collections
+import time
 from operator import itemgetter
 
 class Filter(object):
@@ -244,7 +245,6 @@ class Filter(object):
             varDef = VF.varDefGetter
             res[:] = [v for v in res if varDef(v) in restrict_to_variants]
 
-        
         ### 2. exclude variants. Usually present, and usually gives large reduction.
         if exclude_variants:
             varDef = VF.varDefGetter
@@ -310,6 +310,7 @@ class Filter(object):
             return VF.copyAttributes(variants=res, appliedFilters=self)
 
 
+    
     def prepareTablePrompt(self):
         names = ['Candidate genes', 'Exclude genes', 'Exclude variants', 'Restrict to regions']
         argnames = ['restrict_to_genes', 'exclude_genes', 'exclude_variants', 'regions']
@@ -329,7 +330,105 @@ class Filter(object):
         prompt_text += '\n\nUse the numbers above to indicate the order of filtering steps, separated\nby comma. Use "&" to combine several filters in a single step. If you start\nwith a comma, the first step is unfiltered counts.\n\nExample: If you enter "3,  1 & 2,  4" then the first step consists of filter 3, the \nsecond of filters 1 and 2 combined, and in the last step filter 4.\n\n\nFiltering steps:'
         return [filterlist, filtertext, prompt_text]
 
+def trioRecessiveFilter(VFch, VFfa, VFmo, model):
+    '''Input: 
+    VFch, VFfa, VFmo: VCFtypeData objects which must have been loaded from a single joint calling variant file, with keep00=1.
+    model: Either 'Recessive homozygous' or 'Recessive' (which includes both homozygous and compound heterozygous).
+    '''
+    
+    ### Setup
+    # Local function referances for speed
+    vardef = VFch.chromPosRefAlt
+    annGenes = VFch.annotatedGenes
+    
+    # Utility function for extracting the genotype (as a tuple (a0, a1)) of a single variant
+    # Numerical codes (as in GT field) are used: Important that all family members are in the same VCF file.
+    alleles = VFch.alleles(actualAlleles=False)
+    
+    # Store observed genotypes of all variants in each parents
+    fatherAL = {vardef(v) : alleles(v) for v in VFfa.variants} 
+    motherAL = {vardef(v) : alleles(v) for v in VFmo.variants} 
+    
+    # The set of all variants where at least one parent is homozygous. Entries: ((chrom, pos, ref, alt), A) where A is the observed homozygous allele.
+    parHOM = {(vdef,a[0]) for vdef, a in itertools.chain(fatherAL.iteritems(), motherAL.iteritems()) if a[0]==a[1]!='.'}
+    
+    ### Loop through the variants of the child and check compatibility with recessive inheritance
+    if model == 'Recessive homozygous':
+        # homAllele is a function which takes a single variant as input and returns A if homozygous A/A, or -1 if heterozygous.
+        homAllele = VFch.homAllele()
+        res = []
+        for v in VFch.variants:
+            homa = homAllele(v)
+            if homa != '-1' and not (vardef(v), homa) in parHOM:
+                res.append(v)
+    
+    elif model == 'Recessive':
+        
+        # Storage for variants compatible with simple recessive (homozygous) inheritance
+        homoz = []
+        
+        # Dictionary for gene-wise storing of potential comp. het. variants. (Needed to apply rule 4.)
+        chGene = collections.defaultdict(list)
+        
+        # Dictionary for gene-wise storing of parental origins of the comp.het variants. (Needed to apply rule 5.)
+        fromParent = collections.defaultdict(set)
+        
+        for v in VFch.variants:
+            a = alleles(v)
+            
+            # If REF/REF or missing, skip to next variant.
+            if a == ('.','.') or a == ('0','0'):
+                continue
+            
+            vdef = vardef(v)
+            
+            ### Part 1: Homozygous
+            # If homozygous in child: store if not homoz for same allele in either parent. In any case, continue to next variant.
+            if a[0] == a[1]:
+                if (vdef, a[0]) not in parHOM:
+                    homoz.append(v)
+                continue
+        
+            ### Part 2: Compound heterozygous. Use the 5 rules from Kamphans & al.
+            
+            # Rule 1: the child must be heterozygous. This is automatically fulfilled by now.
+            # Rule 2: unaffected indivs must not be homozygous. In the trio case, this is covered by Rule 3 below.
+            
+            try:
+                # Collect the 4 parental alleles in one list (for later use).
+                # If this fails, the variant is missing from one of the parents. If so: dont include.
+                parent_alleles = fatherAL[vdef] + motherAL[vdef]
+            except KeyError:
+                continue
+            
+            for a1 in a:
+                if a1 == '0': 
+                    continue
+                parentIBS = [pa == a1 for pa in parent_alleles] # a boolean vector of length 4.
+                
+                #Rule 3: the variant should be heterozygous in exactly one of the parents.
+                if sum(parentIBS) != 1: 
+                    continue
+                
+                # Which parent did the allele come from? 0 if paternal, 1 if maternal.
+                whichpar = parentIBS[2] + parentIBS[3]
+                
+                # Add v to the list of potential comphet variants of its associated gene(s).
+                for g in annGenes(v):
+                    chGene[g].append(v)
+                    fromParent[g] |= {whichpar}
+                continue
+                
+        # Rule 4, at gene level: at least two variants in the same gene.
+        # Rule 5, at gene level: at least one variant from each parent.
+        comphets = [v for gene,vars in chGene.iteritems() if len(vars)>1 and len(fromParent[gene])==2 for v in vars]
+        res = homoz + comphets            
+    
+    # Store resulting variants in a VCFtypeData object with the same attributes as VFch.
+    VFres = VFch.copyAttributes(variants=res, appliedFilters=None)
+    return VFres
 
+    
 def removeClosePairs(VF, minDist, variants_only):
     headers = VF.columnNames
     getChr = VF.chromGetter
@@ -359,3 +458,16 @@ def removeClosePairs(VF, minDist, variants_only):
             res.append(chr_vars[-1])
 
     return res if variants_only else VF.copyAttributes(variants=res)
+
+    
+if __name__ == "__main__":    
+    reader = VariantFileReader.VariantFileReader()
+    
+    def test_comphetTrio():
+        test = "example_files\\multiallelic_tests.vcf"; ch_fa_mo=[0,1,2]
+        vflist = reader.readVCFlike(test, sep="\t", chromCol="CHROM", posCol="POS", geneCol="Gene_INFO", splitAsInfo="INFO", keep00=1)
+        VFch, VFfa, VFmo = [vflist[i] for i in ch_fa_mo] 
+        res = trioRecessiveFilter(VFch, VFfa, VFmo, "Recessive")
+        print res.variants
+    
+    test_comphetTrio()
