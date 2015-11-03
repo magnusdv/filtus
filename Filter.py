@@ -421,7 +421,7 @@ def trioRecessiveFilter(VFch, VFfa, VFmo, model):
                 
         # Rule 4, at gene level: at least two variants in the same gene.
         # Rule 5, at gene level: at least one variant from each parent.
-        comphets = [v for gene,vars in chGene.iteritems() if len(vars)>1 and len(fromParent[gene])==2 for v in vars]
+        comphets = [v for gene,vars in chGene.iteritems() if len(vars)>1 and len(fromParent[gene])==2 for v in set(vars)]
         res = homoz + comphets            
     
     # Store resulting variants in a VCFtypeData object with the same attributes as VFch.
