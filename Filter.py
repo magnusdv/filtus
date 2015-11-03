@@ -417,7 +417,7 @@ def trioRecessiveFilter(VFch, VFfa, VFmo, model):
                 for g in annGenes(v):
                     chGene[g].append(v)
                     fromParent[g] |= {whichpar}
-                continue
+                
                 
         # Rule 4, at gene level: at least two variants in the same gene.
         # Rule 5, at gene level: at least one variant from each parent.
