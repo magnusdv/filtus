@@ -248,12 +248,12 @@ class InputDialog(object):
             
         if 'chromCol' in kwargs: self.chromColMenu.setAndCheck(kwargs['chromCol'])
         elif _doGuess('chromCol'):
-            chromCol = _matchHeader(['chrom', 'vcf_chrom', '#chrom', 'chr', 'chromosome'])
+            chromCol = _matchHeader(['#chrom', 'vcf_chrom', 'vcf_chr', 'chrom', 'chr', 'chromosome'])
             if chromCol: self.chromColMenu.setAndCheck(chromCol)
         
         if 'posCol' in kwargs: self.posColMenu.setAndCheck(kwargs['posCol'])
         elif _doGuess('posCol'):
-            posCol = _matchHeader(['pos', 'vcf_pos', 'start', 'position', 'pos_start', 'chromosome_position'])
+            posCol = _matchHeader(['pos', 'vcf_pos', 'vcf_start', 'start', 'position', 'pos_start', 'chromosome_position'])
             if posCol: self.posColMenu.setAndCheck(posCol)
         
         if 'splitAsInfo' in kwargs: 
