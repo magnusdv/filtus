@@ -1,8 +1,9 @@
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 #================================================================
 # FILTUS:  A tool for downstream analysis of variant files
 # See: http://folk.uio.no/magnusv/filtus.html
 #----------------------------------------------------------------
+
 
 PROGRAM_NAME = "FILTUS"
 VERSION = "0.99-95"
