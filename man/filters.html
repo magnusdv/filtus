@@ -1,0 +1,106 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>filters</title>
+
+</head>
+<body>
+<h1 style="color: black;">Filters</h1>
+<div style="text-align: center;"><img alt="Filter area" height="230" src="pictures/filter_area.png"><br></div>
+<h2 style="color: black;">Special filters</h2>
+<p>The first four filters consist of a check box and a labeled
+entry field. The check box controls if the filter is turned on or off:
+If the box in unchecked, the content of the corresponding entry field
+is grayed out and ignored.</p>
+<dl>
+<dt><strong>Restrict to
+genes</strong></dt><dd> Either write in gene names directly in the
+entry field (separated by comma if more than one) or specify a file
+containing gene names. The file should have a single column, no header,
+and one
+gene name per row. If this filter is switched on, variants are excluded
+if their
+gene does not give an exact match to one of the specified genes. If a
+variant is associated with more than one gene, it will pass the filter
+if at least
+one of the genes gives a match.
+</dd><br>
+<dt><strong>Exclude genes</strong></dt><dd>
+This filter is used to avoid certain genes, for instance known sources
+of false positives. As in the "Restrict to genes" field, you can enter
+gene names directly, or indicate a file with gene names. If the filter
+is switched on, variants are excluded if their associated gene is on
+the list. If a variant has more than one associated gene, it is
+excluded if at least one of them is on the list.
+</dd><br>
+<dt><strong>Exclude
+variants</strong></dt><dd> This field expects the file name of a variant
+database. Typically this file is previously made by FILTUS using the
+database functionality, but this is not a requirement. Any variant
+format will work, as long as FILTUS manages to read it, and correctly
+guess which columns contain 1) chromosome number and 2) position. Other
+columns in the file are ignored. If this filter is switched on,
+variants are excluded if they give an exact match to both chromosome
+and position.
+</dd><br>
+<dt><strong>Restrict to
+regions</strong></dt><dd> Here you can specify a file containing genomic
+regions. The file should have no headers and exactly 3 columns
+(separated by tab or space). Each line defines a genomic region by
+stating chromosome number, start and stop positions. For example, the
+file could look like this:<br>
+<span style="font-family: monospace;">2 
+1000  5000</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">X  0
+    2e8</span><br>
+Using this file would keep only variants on chromosome 2 between
+positions 1000 and 5000, and all variants on the X chromosome (since
+the final number is bigger than the physical length of X). Note that
+the chromosome numbers must be written as in the variant files: If the
+variant files use the notation 'chr1', 'chr2', ..., then so must the
+region file.
+</dd><br>
+</dl>
+
+<h2 style="color: black;">Column filters</h2>
+<p>These basic filters work directly on columns
+in each of the loaded samples. Each column filter is defined by 4
+entities: Column name, operator, value and the "keep if missing" check
+box.</p>
+<dl>
+<dt><strong>Column name</strong></dt><dd>
+Clicking on the first button lets you choose
+among all column names present in any of the loaded files. If you
+choose a column name which is missing in some samples, the result is
+highly dependent on the KIM-box (see below).</dd><br>
+<dt><strong>Operator</strong></dt><dd>
+The choices here should be self explanatory.
+Note: To switch off a particular column filter, simply empty either its
+operator or column name button.</dd><br>
+<dt><strong>Value</strong></dt><dd>
+This is the character string or number you want to
+compare with the entries of the specified column. For all operators
+except <em>greater than</em> and <span style="font-style: italic;">less than</span> you can
+use simple combinations
+using the keywords AND or OR. For the operators <em>contains</em>
+and <em>does
+not contain</em> there is also support for regular expressions:
+The keyword
+REGEX indicates that whatever comes after it is a regular expression
+pattern.</dd><br>
+<dt><strong>Keep if
+missing (KIM)</strong></dt><dd> This check box controls what
+happens with variants having an empty entry in the specified column. If
+the KIM-box is checked, these variants are kept, otherwise they are
+excluded. Typical example: When filtering on a column with variant
+frequencies (e.g. 1000 Genomes Project), empty entries often mean a
+frequency of 0. But a column filter like "1000G - less than - 0.01"
+returns FALSE for empty entries, the default action is to remove such
+variants. To keep them, make sure the KIM-box is checked.<br>
+The KIM-box
+also determines the fate of samples not containing the specified
+column. If the KIM-box is checked, that particular column filter is
+simply ignored. If it is unchecked, all variants in this sample are
+excluded (and a warning is displayed).
+</dd><br>
+</dl>
+</body></html>

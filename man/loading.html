@@ -1,0 +1,159 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>loading</title>
+
+</head>
+<body>
+<h1 style="color: black;">
+Loading variant files
+</h1>
+
+<a href="#description">Description</a>&nbsp;&nbsp;
+<a href="#prerequisites">Prerequisites</a>&nbsp;&nbsp;
+<a href="#dialog">Dialogs</a>&nbsp;&nbsp;
+<a href="#tips">Practical tips</a>&nbsp;&nbsp;
+<a href="#algorithm">Algorithm</a>
+
+<h2 id="description" style="color: black;">Description</h2><p>
+This page describes how to load variant files into Filtus. The short story is as follows:
+</p>
+<ul>
+<li>After opening Filtus, choose <em>Load variant files</em> (either simple or advanced) in the <em>File</em> menu.</li>
+<li>Select the files you want to load.</li>
+<li>When the Input settings dialog opens, make appropriate changes if necessary.</li>
+<li>Press <em>Use for all files</em> or <em>Use for this file</em>.</li>
+</ul>
+<p>For more details, continue reading.</p>
+
+<h2 style="color: black;">Prerequisites</h2>
+Filtus is very liberal when it comes to file formats. Basically, the only requirements are:
+<ul>
+<li>Each line describes one variant position. (Files with initial meta information are allowed.)</li>
+<li>Columns are separated by either tab, comma, semicolon or space.</li>
+<li>Column headers are included.</li>
+<li>Columns with the following variant information are mandatory:
+<ul>
+<li>Chromosome</li>
+<li>Position</li>
+<li>Gene (optional, but needed for certain analyses)</li>
+<li>Genotype (optional, but needed for certain analyses)</li>
+</ul>
+</ul>
+As for the genotype, Filtus understands two alternative formats. 
+<ul>
+<li>VCF-like format. This requires a FORMAT column (any column name works) with colon-separated field names, e.g. GT:AD:PL. The remaining columns of the file will then be interpreted as individual samples, 
+and should have entries corresponding to FORMAT. (For details about this, see the official VCF specification.)
+</li>
+<li>Non-VCF format. If your file has a column describing if the variant is heterozygous or homozygous, you can use this as the genotype definition. 
+A typical example would be a column <em>zygosity</em>, with entries <em>het</em> and <em>hom</em>. This format is meaningful only for single-sample variant files where all REF/REF positions are excluded.
+</li>
+</ul>
+
+<h2 style="color: black;">Dialogs</h2>
+<h3 style="color: black;">Load files (simple)</h3>
+<p>This opens a standard window for choosing one or several files
+in a single folder. You can use usual keyboard tricks, such as
+holding down Shift for marking a range of files, and holding down Ctrl
+for marking nonadjacent files.</p>
+
+<h3 id="advanced" style="color: black;">Load files (advanced)</h3>
+<p>If the variant files are spread across several directories (or
+if for some other reason the simple load is cumbersome), the advanced
+file loader can be very useful.</p>
+<div style="text-align: center;"><img alt="Advanced load dialog" src="pictures/advancedload.png" height="330"></div>
+<p>In the example shown here, the program locates all files
+within directory <em>C:\Projects\VariantFiles</em>
+(including subdirectories) whose names end with either <em>vcf</em>
+or <span style="font-style: italic;">csv</span>,
+and do not contain the string <em>_OLD_</em>.
+There are 3 such files, in 3 different subdirectories.</p>
+<p>A few tips worth mentioning:</p>
+<ul>
+<li>When modifying the top directory or any of the restriction
+fields, pressing &lt;Return&gt; has the same effect
+as pushing the <span style="font-style: italic;">Update
+filelist</span>
+button.</li>
+<li>Simple AND/OR constructions can be used in any of the
+restriction fields. This is used in the example entry <kbd>csv OR vcf</kbd> above.
+Another example could be to require file paths/names to contain e.g. <kbd>exome AND fullAnnotation</kbd>.</li>
+<li>Entries starting with <kbd>REGEX</kbd> are interpreted as regular
+expressions. For example, <kbd>REGEX test[1-9]</kbd> would match all files names containing any of the strings 
+<em>test1</em>, <em>test2</em>, ..., <em>test9</em>.</li>
+</ul>
+
+<h3 id="inputsettings" style="color: black;">Input settings</h3>
+<p>Filtus is very flexible when it comes to variant file formats, but this requires a certain (small) effort from the user:
+Indicating which columns contain the essential variant data: chromosome, position,
+gene name and genotype information. Luckily Filtus is quite good at
+guessing all of this, and in many cases one can leave everything
+unchanged. In particular, files in VCF format are automatically
+recognized.</p>
+<div style="text-align: center;"><img alt="Input settings dialog" src="pictures/inputsettings.png" height="350"></div>
+
+<dl>
+<dt><strong>
+Basic settings
+</strong></dt><dd>
+Choose the correct column separator and preamble indicator (if your file has initial meta information). 
+Filtus will treat the first line *not* starting with this indicator, as the header line.
+</dd><br>
+
+<dt><strong>
+Variant settings
+</strong></dt><dd>
+Select columns for chromosome, position, gene and genotype. The latter two can be left empty. See <a href="#prerequisites">Prerequisites</a> for more about the possible genotype formats.
+</dd><br>
+
+<dt><strong>
+Column splits
+</strong></dt><dd>
+For VCF-like files, the default is to split the genotype columns according to the <em>FORMAT</em> column. This can be overruled by unchecking the <em>Split FORMAT/genotypes</em>.<br><br>
+Splitting the INFO column is not done by default, but will be performed if you indicate the correct column in <em>Split as "INFO"</em>. This action will result in the <em>INFO</em> column being replaced by
+new columns according to the tags detected in the original column. The new column names are postfixed by "_INFO".<br><br>
+Additional, simple column splits can also be performed. A typical example would be to split the <em>AD</em> field on ',', which would result in new columns <em>AD1</em>, <em>AD2</em>, ....  
+</dd><br>
+
+<dt><strong>
+Prefilter
+</strong></dt><dd>
+The prefilter option is a powerful way of loading large files, e.g. whole-genome sequencing output with several million variants. If a prefilter is given, it is applied to every line before parsing, 
+and only those that pass are stored in memory. Simple AND/OR combinations can be used, as in <em>"Keep only lines which - contain - protein_coding AND PASS</em>". Regular expressions can also be used, by starting the
+entry with the keyword "REGEX".<br><br>
+</dd><br>
+
+<dt><strong>
+Use for all files
+</strong></dt><dd>
+When loading many files, clicking this button signals that the same settings should sliently be applied to all files.
+</dd><br>
+
+<dt><strong>
+Use for this file
+</strong></dt><dd>
+When loading many files, clicking this button signals that the input settings dialog should be prompted again for the next file. 
+</dd><br>
+
+<dt><strong>
+Skip this file
+</strong></dt><dd>
+When loading many files, clicking this button skips to the next file. If there are no other files to be loaded, it is synonymous to <strong>Cancel</strong>.
+</dd><br>
+
+<dt><strong>
+Cancel
+</strong></dt><dd>
+Cancel the loading process and return to the main Filtus window.
+</dd></dt>
+
+<h2 id="tips" style="color: black;">Practical tips</h2>
+<p><em>Tip 1:</em> 
+For large variant files it is highly recommended to apply a well chosen prefilter - reducing the number of variants to a few hundred thousand at most (depending on the available RAM, and the amount of annotation in the file).
+</p>
+<p><em>Tip 2:</em> 
+When loading a single file, <strong>Use for all files</strong> is synonymous to <strong>Use for this file</strong>.</p>
+
+<h2 id="algorithm" style="color: black;">Algorithm</h2><p>
+Not relevant.
+
+</body></html>
