@@ -1,0 +1,12 @@
+CHROM	POS	REF	ALT	GENE	FITS_MODEL	FORMAT	Aff1	Aff2	Unaff
+1	100	A	C	G1	Dominant	GT	0/1	0/1	0/0
+1	200	A	C	G2	Benign	GT	0/1	0/1	0/1
+1	210	A	C	G2	Benign	GT	1/1	1/1	1/1
+1	300	A	C	G3	Dominant/Recessive	GT	0/1	0/0	0/0
+1	310	A	C	G3	Dominant/Recessive	GT	0/0	0/1	0/0
+1	320	A	C	G3	Recessive	GT	0/1	0/1	0/1
+1	400	A	C	G4	Recessive	GT	1/1	0/0	0/0
+1	410	A	C	G4	Recessive	GT	0/0	1/1	0/0
+1	500	A	C	G5	Benign	GT	0/1	0/2	2/2
+1	600	A	C	G6	Recessive	GT	1/2	0/2	0/1
+1	610	A	C	G6	Recessive	GT	0/1	0/1	0/2
