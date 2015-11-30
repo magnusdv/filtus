@@ -137,7 +137,7 @@ class VariantFileReader(object):
 
 
     def _splitINFO(self, h, variants, infoInd):
-        info = [dict(s.split('=') if '=' in s else [s,'1'] for s in r[infoInd].split(';')) for r in variants]
+        info = [dict(s.split('=', 1) if '=' in s else [s,'1'] for s in r[infoInd].split(';')) for r in variants]
         all_tagheads = sorted(set(tag for dic in info for tag in dic))
         h[infoInd:(infoInd + 1)] = [tag + '_INFO' for tag in all_tagheads]
         for x, infodic in zip(variants, info):
