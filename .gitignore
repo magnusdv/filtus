@@ -59,3 +59,4 @@ target/
 # Magnus test files
 kast*.txt
 filtus__plink__homozyg.*
+*.R
