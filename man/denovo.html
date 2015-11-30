@@ -1,0 +1,129 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>
+de novo
+</title>
+
+</head>
+<body>
+<h1 style="color: black;">
+Detection of <em>de novo</em> variants
+</h1>
+
+
+<a href="#description">Description</a>&nbsp;&nbsp;
+<a href="#prerequisites">Prerequisites</a>&nbsp;&nbsp;
+<a href="#dialog">Dialog</a>&nbsp;&nbsp;
+<a href="#tips">Practical tips</a>&nbsp;&nbsp;
+<a href="#algorithm">Algorithm</a>
+
+<h2 id="description" style="color: black;">Description</h2><p>
+Identification of <em>de novo</em> variants in a trio (child + both parents). Posterior de novo probabilities are computed using a Baysian approach.
+</p>
+
+<h2 id="prerequisites" style="color: black;">Prerequisites</h2><p>
+To apply the <em>de novo</em>
+algorithm in FILTUS, the following requirements should be met:
+<ul>
+<li>The variants of the trio should be contained in <span style="font-style: italic;">a single file</span> containing all three samples. Joint variant
+calling is highly recommended.</li>
+<li>The variant file must have VCF-like genotype
+columns, with the correct FORMAT column indicated in the <a href="loading.html#inputsettings">input settings dialog</a>.</li>
+<li>The FORMAT column (the one with entries like
+GT:AD:DP:GQ:PL) must contain the fields GT, AD and PL, which
+are all used in the algorithm.</li>
+<li>The variant file must be loaded with the <span style="font-style: italic;">keep 0/0</span> option
+checked in the <a href="loading.html#inputsettings">input
+settings dialog</a>.</li>
+</ul>
+
+<p><em>NOTE: If your variant files don't meet the above requirements, there may still be hope! In many cases you can identify potential <em>de novo</em> variants using the 
+<a href="familybased.html#inputsettings">family based filter</a> with a dominant model (follow the link to see details). For instance, if all you have are individual variant files for a child and both parents, 
+this would be the thing to do. The downside is that you wouldn't get posterior probabilities - or any other meassure of classification strength - and probably quite a few more false positives.
+</em></p>
+
+<h2 id="dialog" style="color: black;">Dialog</h2>
+<div style="text-align: center;"><img alt="De novo dialog" height="340" src="pictures/denovo.png"><br></div>
+
+<p>To open the <em>de novo</em>
+dialog, choose <span style="font-style: italic;">De novo
+variant detection</span> in the <span style="font-style: italic;">Analysis</span> menu. Any
+filters (e.g. PASS) should be applied before opening the dialog. The entry points of the dialog are as follows:
+</p>
+
+<dl>
+<dt><strong>
+Trio samples
+</strong></dt><dd>
+Indicate the sample numbers (corresponding to the sample
+order in the <span style="font-style: italic;">Loaded
+samples</span> window in the main Filtus area.) Alternatively,
+you can use the syntax <kbd>ID &lt;string&gt;</kbd> where
+<kbd>&lt;string&gt;</kbd> is a unique identifier for the sample name (as
+given in the variant file). For example, if the sample name of the
+child is "Trio1_child" you can write <kbd>ID child</kbd>. If the string is not
+unique (i.e. if there are multiple loaded sample names containing
+"child"), you will be warned.
+</dd><br>
+<dt><strong>
+Mutation rate
+</strong></dt><dd>
+This is used in the algorithm as the prior probability of a mutation at
+a given position in a single meiosis. Default value: 1e-8. The
+algorithm is usually not very sensitive to this parameter, but the
+posterior probabilities will be affected if you change it radically.
+</dd><br>
+
+<dt><strong>
+Allele frequencies
+</strong></dt><dd>
+Indicate a column containing frequencies for
+the ALT alleles. The <span style="font-style: italic;">Missing
+entry value</span> is substituted whenever the column does not
+contain a number. If your variant file does not have frequency data,
+the <span style="font-style: italic;">Missing entry value</span>
+will be used for all variants. Without correct frequencies, the program
+will still identify the same potential <em>de novo</em> variants,
+but the posterior probabilies may be less accurate.<br><br>
+NB: For multiallelic variants, the frequency column is ignored. As a
+result, any multiallelic variants detected by the de novo algorithm
+gets a missing posterior probability ('-'). Since the output is sorted
+on the posterior probability, these will end up at the bottom of the
+list.
+</dd><br>
+
+<dt><strong>
+Output filters
+</strong></dt><dd>
+The purpose of these filters is to reduce the
+number of false positives in the output. A true heterozygous de novo
+variant is expected to present with ALT/REF ratio close to 50% in the
+child, and 0% in the parents. In practice some slack is recommended,
+e.g. child &gt; 30% and parents &lt; 5%.<br><br>
+One may experiment
+with these filters for other purposes too: For example, to look for de
+novo mosiac variants in the child one could try a very loose cutoff for
+the child, e.g. child &gt; 10%, while requiring parents = 0%. Or
+oppositely, for variants inherited from a mosaic parent, something like
+parents &lt; 25% and child &gt; 40% would be sensible, without
+including too much garbage. Of course, these are merely
+suggestions whose validity depend heavily on the actual
+contents of the variant file. (E.g. the quality of the
+variants and the parameters of the variant calling.) </dd><br>
+
+<dt><strong>
+Summary
+</strong></dt><dd>
+A summary of the findings is printed here. The identified variants are shown in the main Filtus window; to inspect them you must close the de novo dialog. 
+</dd></dl>
+
+<h2 id="tips" style="color: black;">Practical tips</h2>
+<p><em>Tip 1:</em> 
+To save the results, first close the de novo dialog, and then select Save main window content in the File menu.</p>
+<p><em>Tip 2:</em> 
+When browsing variants in the main Filtus window, you can right click on any particular variant to see details about that variant for all the samples.</p>
+
+<h2 id="algorithm" style="color: black;">Algorithm</h2><p>
+TODO
+
+</body></html>

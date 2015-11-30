@@ -1,0 +1,71 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>gene sharing</title>
+
+</head>
+<body>
+<h1 style="color: black;">
+Gene sharing: Unrelated samples
+</h1>
+
+<a href="#description">Description</a>&nbsp;&nbsp;
+<a href="#prerequisites">Prerequisites</a>&nbsp;&nbsp;
+<a href="#dialog">Dialog</a>&nbsp;&nbsp;
+<a href="#tips">Practical tips</a>&nbsp;&nbsp;
+<a href="#algorithm">Algorithm</a>
+
+<h2 id="description" style="color: black;">Description</h2><p>
+Identification of genes where all the affected have variants compatible with the disease model. Unafected samples are used as an additional filter.
+</p>
+
+<h2 id="prerequisites" style="color: black;">Prerequisites</h2><p>
+The analysis can be applied to any variant files loadable in Filtus, as long as the genotype format is correctly given in the input settings. 
+In particular, samples from different variant files can be analyzed together, even if the files have different formats.<br><br>
+For Recessive analysis, all involved samples must have a well defined gene column (specified in the input settings). 
+
+<h2 id="dialog" style="color: black;">Dialog</h2>
+<div style="text-align: center;"><img alt="Gene sharing dialog" height="180" src="pictures/genesharing.png"><br></div>
+<dl>
+<dt><strong>
+Model
+</strong></dt><dd>
+The genetic disease model, either <em>Dominant</em>, <em>Recessive</em> (which includes both compound heterozygous and homozygous models) and <em>Recessive homoz</em> (homozygous only).
+</dd><br>
+
+<dt><strong>
+Affected
+</strong></dt><dd>
+Indicate the affected samples, separated by comma. Samples can be specified in various ways:
+<ul><li>Sample numbers, corresponding to the order in the <em>Loaded samples</em> window. Example: <kbd>2,3,4,10,11,15</kbd>.</li>
+<li>Number ranges. For instance the previous example could be written <kbd>2-4, 10-11, 15</kbd>.</li>
+<li>Text identifiers. You can write <kbd>ID &lt;s1&gt;, ...</kbd> where <kbd>&lt;s1&gt;, ...</kbd> are uniquely identifying parts of the wanted sample names. 
+For example, to specify the samples <em>bigprojectA001</em> and <em>bigprojectA002</em>, one could use <kbd>ID A001, A002</kbd>, or perhaps just <kbd>ID 1, 2</kbd>. 
+If a string matches more than one sample name, you will get a warning.</li>
+<li>Negative selection. If the entry starts with <kbd>NOT</kbd>, all loaded samples will be chosen except those specified. This works both with numbers and <kbd>ID</kbd> identifiers. 
+For example, <kbd>NOT 1-10</kbd> selects all samples except the first 10, while <kbd>NOT ID A001, A002</kbd> results in all samples except the two matching 
+<em>A001</em> and <em>A002</em> respectively.</li>
+</ul>
+</dd><br>
+
+<dt><strong>
+Healthy
+</strong></dt><dd>
+Indicate the unaffected/control samples. Syntactic choices are as for the <strong>Affected</strong> field.
+</dd>
+
+</dl>
+
+<h2 id="tips" style="color: black;">Practical tips</h2>
+<p><em>Tip 1:</em>
+The identified genes are displayed in the main window, sorted on the p-value. You can sort on any column by right clicking on the column header.
+</p>
+<p><em>Tip 2:</em>
+Right click on a gene to view the relevant variants in that gene. You can also view the variants in all identified genes simultaneously, or in the genes on top of the list.
+</p>
+
+
+<h2 id="algorithm" style="color: black;">The algorithm</h2><p>
+todo
+</p>
+
+</body></html>

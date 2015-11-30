@@ -1,0 +1,97 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>
+qc plots
+</title>
+
+</head>
+<body>
+<h1 style="color: black;">
+QC plots
+</h1>
+
+<a href="#description">Description</a>&nbsp;&nbsp;
+<a href="#prerequisites">Prerequisites</a>&nbsp;&nbsp;
+<a href="#dialog">Dialog</a>&nbsp;&nbsp;
+<a href="#tips">Practical tips</a>&nbsp;&nbsp;
+<a href="#algorithm">Algorithm</a>
+
+<h2 id="description" style="color: black;">Description</h2><p>
+Various plots for quality control and exploration of variant files.
+</p>
+
+<h2 id="prerequisites" style="color: black;">Prerequisites</h2><ul><li>
+Some of the plots use genotype information, and thus will not work if genotype format is left blank in the Input settings.
+</li>
+</ul>
+
+<h2 id="dialog" style="color: black;">Dialog</h2>
+<div style="text-align: center;"><img alt="QC plots dialog" height="350" src="pictures/qcplots.png"><br></div>
+
+<dl>
+<dt><strong>
+Select samples
+</strong></dt><dd>
+Select the samples you want to include. Note: For scatter plots and histograms there will be one plot per selected sample.
+</dd><br>
+
+<dt><strong>
+Comparative plots
+</strong></dt><dd>
+Each of these produce a single scatter plot, where each dot represents a sample. With 12 or fewer selected samples, they get different symbols, and a legend is included in the plot.
+If <em>Write to text</em> is checked, the coordinates of all plotted points will be written to the specified file.<br><br>
+<ul><li>
+<strong>Gender.</strong> This is a simple gender estimator. For each sample the program computes the percentage of 
+heterozygous variants on the X chromosome outside of the pseudoautosomal regions PAR1 and PAR2. The result is plotted against the total number of variants in the same region.
+Males are expected to have heterozygosity close to 0%, while for females the value should be similar to their autosomal heterozygosity 
+(typically around 60%, but in the plot this depends heavily on the filters applied). Also, men are expected to have fewer variants than females.<br>
+The plot region is divided into male/female/uncertain regions to help interpretation. However, the thresholds used for this are purely ad hoc and should not be given much emphasis.
+</li><br>
+<li>
+<strong>Private variants.</strong> This plot shows the number of private variant positions for each sample (i.e. non-REF/REF variants not observed in any other of the selected samples), 
+plotted against the total number of variants. For speed and simplicity, heterozygous and homozygous variants are counted equally. Outliers in this plot, e.g. a sample with many more private variants than the others,
+could be a sign of sequencing/bioinformatic errors, or it could be an individual from a very different population that the others. 
+Oppositely, individuals with few private variants suggest relatedness between the selected samples.
+</li><br><li>
+<strong>Heterozygosity.</strong> Here the autosomal heterozygosity ratio is plotted against the total number of autosomal variant positions for each sample. 
+The main use of this is catching outliers: If the samples come from a fairly homogeneous batch, there should usually be very little variance in heterozygosity. 
+Some deviation could be caused by inbreeding (reduces heterozygosity), or large deletions or insertions.
+</li>
+</ul>
+<br>
+<dt><strong>Scatter plots</strong></dt><dd>
+Produces a grid of scatter plots (one for each selected sample) of the two columns. Only works for numerical entries. 
+(If there are non-numerical entries in a column you want to plot, add an appropriate column filter before opening the plot dialog.)
+Each point represents a single variant, color coded according to genotype. 
+If the parameter <em>Thin by</em> is an integer k > 1, then only every k'th variant is plotted. 
+Finally, the transparency of the plot symbols can be controlled by the <em>Transp.</em> parameter (0=fully transparent, 1=no transparency).
+</dd><br>
+
+<dt><strong>Histogram plots</strong></dt><dd>
+Produces histograms - one for each selected sample - of a numerical column.
+</dd>
+
+</dl>
+
+<h2 id="tips" style="color: black;">Practical tips</h2>
+<p><em>Tip 1:</em>
+Before making QC plots it is recommended to apply filters removing low quality variants. This is particularly important for the <strong>Gender</strong> plot. All plots are produced from the filtered samples.
+</p>
+<p><em>Tip 2:</em>
+With more than 12 samples, there is no legend in the comparative plots. To find out which sample belongs to which dot, use the <em>Write to text</em> option. This gives you exact coordinates for all the samples.
+</p>
+<p><em>Tip 3:</em>
+The <strong>Gender</strong> and <strong>Private variants</strong> in combination gives a quick way of deducing who's who in a trio: 
+First identify the child as the one with (close to) zero private variants, and then use the gender estimates of the two remaining individuals
+to pinpoint the mother and father.
+</p>
+<p><em>Tip 4:</em>
+The scatter plots and histograms may be distorted to the point of uselessness by a few outliers. If this happens, close the QC PLOTS dialog, and add a column filter which removes the extreme values. 
+Then try plotting again.
+</p>
+
+<h2 id="algorithm" style="color: black;">Algorithm</h2><p>
+Not relevant for this analysis.
+</p>
+
+</body></html>
