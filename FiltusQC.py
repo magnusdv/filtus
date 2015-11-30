@@ -199,7 +199,7 @@ def setPlotParams(ax, title, xlab, ylab, xlim=None, ylim=None):
     ax.xaxis.set_ticks(new_xt)
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    ax.set_aspect((xlim[1]-xlim[0])/(ylim[1]-ylim[0]))
+    ax.set_aspect(float((xlim[1]-xlim[0])/(ylim[1]-ylim[0]))) # float to avoid matplotlib (or numpy?) unicodewarning
     
 def scatterPlot(VFlist, xcol, ycol, alpha, thin, NA_vals = ('', 'NA', '.', '-'), GTlegend="upper left", save=None, show=True):
     N = len(VFlist)
@@ -306,7 +306,7 @@ def QC_3plots(VFlist, gender=True, private=True, heterozygosity=True, writetofil
     
     DB = FiltusDatabase.VariantDatabase.buildFromSamples(VFlist, "Extended")
     db_str = DB.variants
-
+    
     if writetofile:
         sep = '\t'
         text_out = FiltusUtils.preambleNY(VFlist, analysis="QC PLOTS")
@@ -326,7 +326,6 @@ def QC_3plots(VFlist, gender=True, private=True, heterozygosity=True, writetofil
         else:
             totals_X, hets = [0]*N, [0]*N
             #print "Empty gender estimation plot.\n\nNo variants found on X \ PAR."
-        
         setPlotParams(ax_sex, "Gender estimation", 'Variants on X (-PAR)', 'Heterozygosity (%)', ylim=(0,100))
         ax_sex.axhspan(0, 15, facecolor='blue', alpha=0.2)
         ax_sex.axhspan(15, 35, facecolor='red', alpha=0.2)
@@ -400,9 +399,9 @@ def QC_3plots(VFlist, gender=True, private=True, heterozygosity=True, writetofil
         ax_legend.set_frame_on(False)
         ax_legend.axis('off')
         for i in range(N):
-            ax_legend.plot(None, marker=markers[i], color=cols[i], markersize=sizes[i], label=simplenames[i], ls='None')
+            ax_legend.plot([], marker=markers[i], color=cols[i], markersize=sizes[i], label=simplenames[i], ls='None')
         ax_legend.legend(loc=2, numpoints=1, fontsize='small', frameon=False, title="Legend")
-    
+        
     showAndSave(fig, tight=True, show=show, save=save)
     return fig
     
