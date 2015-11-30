@@ -130,8 +130,6 @@ class Filtus(object):
         self.menuBar.grid(row=0, column=0, sticky='ew')
         self.scrollframe.grid(row=1, sticky='news', padx=20, pady=(10, 20))
         
-        print frame.winfo_height()
-        print frame.winfo_width()
         parent.update_idletasks()
         self.scrollframe.component('clipper').configure(height=min(frame.winfo_height(), frame.winfo_screenheight()-100),
                                                     width=min(frame.winfo_width()+200, frame.winfo_screenwidth()-100)) # the 200 is ad hoc to increase startup width a little
