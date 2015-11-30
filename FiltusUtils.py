@@ -280,7 +280,7 @@ def cummin(v):
         a.append(min(a[-1], v[i]))
     return a
 
-def pValue(m, Lrel, n, k, model, approx=False): #m = average vars after filtr; Mny = total # genes/relative length of gene in question; n = #samples; k = #successes
+def pValue(m, Lrel, n, k, model, approx=False): #m = average vars after filtr; Lrel = relative length of gene in question; n = #samples; k = #successes
     if model == 'Dominant':
         bernouP = max(m * Lrel, 1.0) if approx else 1-(1.0-Lrel)**m
     elif model.startswith('Recessive'):

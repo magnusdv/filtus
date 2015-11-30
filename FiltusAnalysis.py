@@ -414,24 +414,22 @@ class ColumnSummary(object):
 
 
 class GeneSharingComputer(object):
-    def __init__(self, genelengths=None):
-        self.genelengths = genelengths if genelengths else {}
+    def __init__(self):
+        pass
+        #self.genelengths = {}
         
+    def analyze(self, VFcases, VFcontrols, model, family, VFcases_index=None, VFcontrols_index=None, minSampleCount=1, genelengths=None):
+        print 'genelengths', len(genelengths)
         
-    def analyze(self, VFcases, VFcontrols, model, family, VFcases_index=None, VFcontrols_index=None, minSampleCount=1):
         intlist2string, pValue = FiltusUtils.intlist2string, FiltusUtils.pValue
         #M, totL = self.M, self.totL
-        genelengths = self.genelengths
         n = len(VFcases)
         
         filter = Filter.Filter(model=model, controls=VFcontrols, benignPairs=None if family else True)
         VFcases_filt = [filter.apply(VF) for VF in VFcases]
+        m_aver = sum(vf.nVars(diploid=True) for vf in VFcases_filt)/float(n) 
+        print 'genesharing computer, m_aver=', m_aver
         
-        includePvals = genelengths and not family
-        if includePvals: 
-            # Average number of variants (after filt) per sample:
-            m_aver = sum(vf.nVars(diploid=True) for vf in VFcases_filt)/float(n) 
-    
         VFcases_index = list(VFcases_index) if VFcases_index else range(len(VFcases))
         if VFcontrols_index:
             VFcontrols_index = list(VFcontrols_index)
@@ -491,13 +489,28 @@ class GeneSharingComputer(object):
         if minSampleCount > 1: 
             analys_txt += "\n## Minimum number of affected: %d" % minSampleCount
         meta = FiltusUtils.preambleNY(VFlist=VFcases+VFcontrols, VFindex=VFcases_index+VFcontrols_index, analysis=analys_txt)
-        result = DataContainer.GeneSharingResult.geneMaster(gD, nSamples=n, minSampleCount=minSampleCount, genelengths=genelengths, meta=meta)
+        result = DataContainer.GeneSharingResult.geneMaster(gD, nSamples=n, minSampleCount=minSampleCount, genelengths=genelengths, model=model, meta=meta)
         result.sort(column='SampleCount', descending=True)
-        if includePvals: 
-            result.sort(column='P_raw', descending=False)
         return result
     
- 
+    # def readGenelengths(self, file):
+        # file = os.path.normpath(file)
+        # res = {}
+        # if not os.path.isfile(file):
+            # raise IOError("Gene length file does not exist: %s."% file)
+        # try:
+            # with open(file, 'rU') as f:
+                # for line in f:
+                    # try:
+                        # gen, length = line.split('\t')[:2]
+                        # res[gen] = float(length)
+                    # except ValueError:
+                        # continue
+            # if not res:
+                # raise IOError("Empty file: %s."%file)
+        # except ValueError as e:
+            # raise ValueError("Gene length file does not have correct format (tab-separated columns: Gene - length in bp).\n\n%s" % e)
+
 class VariantSharingComputer(object):
     def __init__(self):
         pass
@@ -758,7 +771,7 @@ class NgTable(object):
 
         data = DataContainer.NgData(coldat, self.title, subtitle)
         meta = FiltusUtils.preambleNY(VFlist=VFall, analysis=data.analysis_text)
-        self.filtus.text.prettyPrint(data, meta=meta)
+        self.filtus.text.prettyPrint(data, meta=meta, label="Filter table")
 
     def execute(self, button):
         if button is None or button == 'Cancel':

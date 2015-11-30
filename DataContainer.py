@@ -141,15 +141,15 @@ class ColumnData(object):
 
 class GeneSharingResult(ColumnData):
     def __init__(self, data, nSamples, geneMaster, shareCounts, minSampleCount=1, meta=''):
-        heads = ['Gene', 'SampleCount', 'SampleIndex', 'Variants', 'Unique', 'Length']
-        if data and len(data[0]) == 8: heads += ['P_raw', 'P_bonf' ]
+        heads = ['Gene', 'SampleCount', 'SampleIndex', 'Variants', 'Unique']
+        if data and len(data[0]) == 8: heads += ['GeneLength', 'P_raw', 'P_bonf' ]
         
         columnDescriptions = {'Gene':'Gene name', 
             'SampleCount':'Number of affected samples whose remaining variants in this gene match the given model', \
             'SampleIndex':'Indices of the affected samples whose remaining variants in this gene match the given model', \
             'Variants':'Total number of variants in all affected samples matching the model criteria in this gene', \
             'Unique':'Number of unique variants matching the model criteria in this gene', \
-            'Length':'Gene length (available if a file with gene lengths is indicated in Settings -> Gene lengths)'}
+            'Length':'Gene length (available if a file with gene lengths is indicated in Settings)'}
         ColumnData.__init__(self, columnNames=heads, variants=data, columnDescriptions=columnDescriptions, meta=meta)
         self.geneMaster = geneMaster
         self.shareCounts = shareCounts
@@ -157,9 +157,16 @@ class GeneSharingResult(ColumnData):
         self.minSampleCount = minSampleCount
         
     @classmethod
-    def geneMaster(cls, geneMaster, nSamples, minSampleCount=1, genelengths={}, pValues=False, meta=''):
+    def geneMaster(cls, geneMaster, nSamples, minSampleCount=1, genelengths={}, model="Dominant", meta=''):
         intlist2string = FiltusUtils.intlist2string
         shareCounts, data = [0]*nSamples, []
+        M = float(len(genelengths))
+        totL = float(sum(genelengths.itervalues()))
+        
+        # Average number of variants (after filt) per sample:
+        m_aver = sum(g.length for g in geneMaster.itervalues())/float(nSamples) 
+        print 'datacontainer geneMaster, m_aver=', m_aver
+        
         for gene in geneMaster.keys():
             geneData = geneMaster[gene]
             samplecount = geneData.nFiles()
@@ -170,18 +177,25 @@ class GeneSharingResult(ColumnData):
             samples = intlist2string(geneData.getFiles())
             nvars = geneData.length
             nuniqvars = geneData.nUniqVars()
-            length = genelengths[gene] if gene in genelengths else '-'
-            _info = [gene, samplecount, samples, nvars, nuniqvars, length]
+            _info = [gene, samplecount, samples, nvars, nuniqvars]
+            if genelengths:
+                length = genelengths.get(gene, '-')
+                try:
+                    pval = FiltusUtils.pValue(m=m_aver, Lrel=length/totL, n=nSamples, k=samplecount, model=model)
+                    pval_bonf = min(pval * M, 1)
+                    _info.extend([length, '{:.3g}'.format(pval), '{:.3g}'.format(pval_bonf)])
+                except:
+                    _info.extend([length, '-', '-'])
             data.append(_info)
 
         return cls(data, nSamples, geneMaster, shareCounts, minSampleCount=minSampleCount, meta=meta)
         
-    def addPvalues(self, gene, genelengths, m_aver, length, totL, model): #TODO: fix this!
-        if gene in genelengths:
-            pval = pValue(m_aver, length/totL, nSamples, samplecount, model=model)
+    def addPvalues(self, samplecount, m_aver, length, totL, M, model):
+        try:
+            pval = FiltusUtils.pValue(m=m_aver, Lrel=length/totL, n=nSamples, k=samplecount, model=model)
             pval_bonf = min(pval * M, 1)
             return ['{:.3g}'.format(pval), '{:.3g}'.format(pval_bonf)]
-        else:
+        except:
             return ['-', '-']
             
     def copyAttributes(self, data=None):
