@@ -16,7 +16,7 @@ import FiltusAnalysis
 import InputDialog
 try:
     import FiltusQC
-    import FiltusRelatedness
+    #import FiltusRelatedness
     PLOT_available = 1
 except ImportError:
     PLOT_available = 0

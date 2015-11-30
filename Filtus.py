@@ -250,8 +250,8 @@ class Filtus(object):
         menuBar.addmenuitem('Analysis', 'separator')
         menuBar.addmenuitem('Analysis', 'command', None, command=self.denovo_prompt, label="De novo variant detection", font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'separator')
-        menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_pair_prompt, label="Pairwise relatedness", font=self.defaultfont)
-        menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_trio_prompt, label="Trio relatedness", font=self.defaultfont)
+        #menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_pair_prompt, label="Pairwise relatedness", font=self.defaultfont)
+        #menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_trio_prompt, label="Trio relatedness", font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'command', None, command=self.pairwiseSharing, label='Pairwise variant sharing', font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'separator')
         menuBar.addmenuitem('Analysis', 'command', None, command=self.QC_prompt, label='QC plots', font=self.defaultfont) 
@@ -362,9 +362,8 @@ class Filtus(object):
         try:
             FiltusUtils.activateInCenter(self.parent, self.relatednessgui)
         except Exception as e:
-            #FiltusUtils.warningMessage("%s: %s" %(type(e).__name__, e))
-            raise
-    
+            FiltusUtils.warningMessage("%s: %s" %(type(e).__name__, e))
+            
     def relatedness_trio_prompt(self):
         if not self.checkLoadedSamples(select="all"): return
         if not hasattr(self, 'relatedness_trio_gui'):
@@ -372,9 +371,8 @@ class Filtus(object):
         try:
             FiltusUtils.activateInCenter(self.parent, self.relatedness_trio_gui)
         except Exception as e:
-            #FiltusUtils.warningMessage("%s: %s" %(type(e).__name__, e))
-            raise
-        
+            FiltusUtils.warningMessage("%s: %s" %(type(e).__name__, e))
+            
     def pedwriter_prompt(self):
         if not self.checkLoadedSamples(select="all"):
             return
@@ -812,18 +810,6 @@ if __name__ == "__main__":
         filtus.plinkgui._prepare()
         filtus.plinkgui.execute("Compute")
         filtus.plink_prompt()
-        print "ok"
-        
-    def test_relatedness():
-        print "Testing relatedness........",
-        filtus.clearAll()
-        frCol = "1000g2012apr_all"
-        filtus.loadFiles([triotest], guess=1, prompt=0, keep00=1, splitAsInfo="")
-        prom = filtus.relatedness_trio_gui = FiltusWidgets.RelatednessTrio_GUI(filtus)
-        for s, name in zip(prom.sampleOMlist, reversed(filtus.shortFileNameList[:3])):
-            s.setvalue(name)
-        prom.altFreqMenu.setvalue(frCol)
-        filtus.relatedness_trio_prompt()
         print "ok"
         
     if len(sys.argv) > 1 and sys.argv[1].startswith("test"):
