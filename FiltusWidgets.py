@@ -1,12 +1,14 @@
 # -*- coding: latin-1 -*-
-import Tkinter
-import tkFileDialog
-import Pmw
 import os
 import os.path
 import re
 import gc
 from operator import itemgetter
+
+import Tkinter
+import tkFileDialog
+import webbrowser
+import Pmw
 
 import Filter
 import FiltusUtils
@@ -14,9 +16,24 @@ import FiltusAnalysis
 import InputDialog
 try:
     import FiltusQC
+    import FiltusRelatedness
     PLOT_available = 1
 except ImportError:
     PLOT_available = 0
+import pprint
+
+class HelpButton(Tkinter.Button):
+    def __init__(self, parent, filtus, page, bookmark=None, text='?', font=None):
+        self.filtus = filtus
+        if font is None: font=filtus.defaultfont
+        Tkinter.Button.__init__(self, parent, text=text, font=font, padx=2, pady=0, bd=1, height=1, highlightthickness=0, command=self.showInBrowser)
+        self.pagepath = os.path.abspath(os.path.join(filtus.manualdir, page + '.html'))
+        if bookmark is not None:
+            self.pagepath += '#%s'%bookmark
+            
+    def showInBrowser(self):
+        self.filtus.openWebPage(self.pagepath)
+
 
 class PedWriter(Pmw.Dialog):
     def __init__(self, filtus):
@@ -236,19 +253,22 @@ class AdvancedLoad(object):
         self.files = []
         self.dir = filtus.currentFileDir
         self.dialog = Pmw.Dialog(parent, buttons=('Load', 'Cancel'), title='Advanced load', command=self.doCommand, buttonbox_pady=10, 
-                dialogchildsite_padx=20, dialogchildsite_pady=10, activatecommand=self.updateFilelist)
+                dialogchildsite_padx=0, dialogchildsite_pady=0, activatecommand=self.updateFilelist)
         self.dialog.withdraw()
-        interior = self.dialog.interior()
+        interior0 = self.dialog.interior()
+        interior = Tkinter.Frame(interior0) #self.dialog.interior()
+        interior.grid(row=0, column=0, padx=20, pady=10, sticky='news')
+        HelpButton(interior0, filtus=filtus, page="loading", bookmark="advanced").grid(row=0, column=0, sticky="ne")
+        
         interior.columnconfigure(0, weight=1)
         interior.rowconfigure(3, weight=1)
         
         # Title label
-        Tkinter.Label(interior, text='Load all files in a directory', font=filtus.titlefont).grid(padx=20, pady=10)
-        
+        Tkinter.Label(interior, text='Advanced file selector', font=filtus.titlefont).grid(row=0, padx=20, pady=10)
         dir_group = Pmw.Group(interior, tag_text = 'Directory')
         dir_interior = dir_group.interior()
         
-        self.dirEntry = Pmw.EntryField(dir_interior, entry_width=20, entry_state='normal', value = self.dir)#label_text="Directory:", labelpos=None, labelmargin=5)
+        self.dirEntry = Pmw.EntryField(dir_interior, entry_width=20, entry_state='normal', value = self.dir)
         self.dirEntry.component('entry').bind("<Return>", self.updateFilelist)
         
         buttwidth=8 if filtus.windowingsystem == 'aqua' else 6
@@ -277,6 +297,7 @@ class AdvancedLoad(object):
         for i, str in enumerate(['endswith', 'contains', 'exclude']):
             intvar, entry = getattr(self, str+'Var'), getattr(self, str+'Entry')
             Tkinter.Checkbutton(option_interior, variable = intvar).grid(row=i + 1, sticky='w', padx=(10,0), pady=5)
+            entry.component('entry').bind("<Return>", self.updateFilelist)
             entry.grid(row=i + 1, column=1, sticky='we', pady=5, padx=(0,10))
 
         Tkinter.Button(option_interior, text="Update file list", command=self.updateFilelist).grid(columnspan=2, pady=5)
@@ -286,12 +307,18 @@ class AdvancedLoad(object):
         file_group = Pmw.Group(interior, tag_text = 'File list')
         file_interior = file_group.interior()
         file_interior.rowconfigure(0, weight=1)
-        self.preview = Pmw.ScrolledListBox(file_interior, labelpos=None, listbox_height=6, listbox_activestyle='none', listbox_selectmode='extended', listbox_font=filtus.monofont)
+        self.preview = Pmw.ScrolledListBox(file_interior, labelpos=None, selectioncommand=self.updateFileCount, 
+                        listbox_height=6, listbox_activestyle='none', listbox_selectmode='extended', listbox_font=filtus.monofont)
+        listbox = self.preview.component('listbox')
+        listbox.bind('<Control-a>', self.selectAll)
+        listbox.bind('<KeyRelease-Up>', self.updateFileCount)
+        listbox.bind('<KeyRelease-Down>', self.updateFileCount)
+        
         self.preview.grid(sticky='news', pady=(5,0), padx=10)
-        self.previewSize = Tkinter.StringVar(parent, value='Files found: 0')
+        self.previewSize = Tkinter.StringVar(parent)
         Tkinter.Label(file_interior, textvariable = self.previewSize).grid(row=1, column=0, sticky='nw', pady=(0,5), padx=10)
         
-        Tkinter.Button(file_interior, text="Remove selected", command=self.removeSelected).grid(row=1, column=0, sticky='ne', pady=(0, 5), padx=10)
+        Tkinter.Button(file_interior, text="Select all", command=self.selectAll).grid(row=1, column=0, sticky='ne', pady=(0, 5), padx=10)
         
         for g in [dir_group, option_group, file_group]:
             expandcol = 1 if g is option_group else 0 
@@ -299,18 +326,17 @@ class AdvancedLoad(object):
             g.configure(tag_font = filtus.smallbold)
             g.grid(sticky='news', padx=10, pady=7)
         
-        self.updateFilelist()
+        #self.updateFilelist()
         
 
     def align(self):
         Pmw.alignlabels([self.subdirLabel, self.endswithEntry, self.containsEntry, self.excludeEntry])
 
-    def removeSelected(self):
-        for i in reversed([int(i) for i in self.preview.curselection()]):
-            self.files.pop(i)
-        self.setFilelist()
-
-    def updateFilelist(self):
+    def selectAll(self, event=None):
+        self.preview.setvalue(self.preview.get())
+        self.updateFileCount()
+        
+    def updateFilelist(self, event=None): # event unused, needed when function is used as callback
         newdir = self.dirEntry.getvalue().strip()
         if newdir != self.dir:
             self.dir = newdir
@@ -320,12 +346,13 @@ class AdvancedLoad(object):
         exclude = self.excludeEntry.getvalue() if self.excludeVar.get() else None
         
         self.files = self.getFiles(self.dir, subdir, endswith, contains, exclude)
-        self.setFilelist()
-
-    def setFilelist(self):
         self.preview.setlist([' ' + os.path.relpath(filpath, self.dir) for fil, filpath in self.files])
-        self.previewSize.set("Files found: %d" %len(self.files))
+        self.updateFileCount()
 
+    def updateFileCount(self, event=None): # event unused, needed when function is used as callback
+        n = len(self.preview.getvalue())
+        self.previewSize.set("Files selected: %d" % n)
+        
     def askdir(self):
         dir = tkFileDialog.askdirectory(initialdir=self.filtus.currentFileDir)
         if dir:
@@ -352,20 +379,26 @@ class AdvancedLoad(object):
         return sorted(files, key=itemgetter(1))
 
     def doCommand(self, result):
+        if result != "Load":
+            self.dialog.deactivate()
+            return
+        files = [os.path.join(self.dir, f.strip()) for f in self.preview.getvalue()]
+        if not files: 
+            FiltusUtils.warningMessage("No files selected.")
+            return
         self.dialog.deactivate()
-        if result == 'Load':
-            self.filtus.loadFiles([filwpath for fil, filwpath in self.files])
-
+        self.filtus.loadFiles(files)
+        
 
 class FiltusText(Pmw.ScrolledText):
-    def __init__(self, parent, filtus, label=None):
-        labelpos = 'n' if not label is None else None
-        Pmw.ScrolledText.__init__(self, parent, borderframe=5, columnheader=True,
-                labelpos=labelpos, scrollmargin=0, vscrollmode='static', hscrollmode='static', 
-                text_width=40, text_height=20, text_wrap='none', text_font=filtus.monofont, 
+    def __init__(self, parent, filtus, **kw):
+        defaultopts = dict(borderframe=5, columnheader=True, labelpos=None,
+                scrollmargin=0, vscrollmode='static', hscrollmode='static', 
+                text_width=50, text_height=20, text_wrap='none', text_font=filtus.monofont, 
                 Header_font=filtus.monofont)
-        if label is not None: self.configure(label_text=label)
-        
+        defaultopts.update(kw)
+        Pmw.ScrolledText.__init__(self, parent, **defaultopts)
+            
         self.filtus = filtus
         self.textfield = self.component('text')
         self.columnheader = self.component('columnheader')
@@ -388,7 +421,10 @@ class FiltusText(Pmw.ScrolledText):
         
         for event in filtus.rightclickevents:
             self.columnheader.bind(event, self._showSortMenu)
-                
+    
+    def setlabel(self, label):
+        self.configure(label_text=label)
+        
     def _selectColumn(self):
         self.clipboard_clear()
         VF = self.currentColDat
@@ -408,11 +444,11 @@ class FiltusText(Pmw.ScrolledText):
 
     def _sort_up(self):
         self.currentColDat.sort(self.chosenColumn, False)
-        self.prettyPrint(self.currentColDat, rightClick=self.rightClick)#, meta=self.meta)
+        self.prettyPrint(self.currentColDat, rightClick=self.rightClick)
 
     def _sort_down(self):
         self.currentColDat.sort(self.chosenColumn, True)
-        self.prettyPrint(self.currentColDat, rightClick=self.rightClick)#, meta=self.meta)
+        self.prettyPrint(self.currentColDat, rightClick=self.rightClick)
 
     def _showDescription(self):
         descr = self.currentColDat.columnDescriptions.get(self.chosenColumn, "No description available")
@@ -437,13 +473,14 @@ class FiltusText(Pmw.ScrolledText):
         if not wordend: return ''
         else: return wordend.group()
 
-    def prettyPrint(self, ColDat, rightClick=None, meta=None, truncate=None, pad=None):
+    def prettyPrint(self, ColDat, rightClick=None, meta=None, truncate=None, pad=None, label=None):
         self.currentColDat = current = ColDat.copyAttributes() # in case of sorting or other changes.
         self.headers = current.columnNames
         if meta: self.currentColDat.meta = meta
         if truncate is None: truncate=self.filtus.truncate
         if pad is None: pad = self.pad
         headerLine, body = current.printData(trunc=truncate, pad=pad)
+        if label is not None: self.setlabel(label)
         self.columnheader.delete('1.0', 'end')
         self.columnheader.insert('1.0', headerLine)
         self.settext(body)
@@ -521,7 +558,7 @@ class GeneView(Pmw.Dialog):
         interior.columnconfigure(0, weight=1)
         interior.rowconfigure(1, weight=1)
         Tkinter.Label(interior, text=title, font=filtus.titlefont).grid(padx=20, pady=10)
-        self.text = FiltusText(interior, filtus=filtus, label='')
+        self.text = FiltusText(interior, filtus=filtus, labelpos='n')
         self.text.grid(padx=20, pady=20, sticky='news')
         
         self.collapseButton = self.component('buttonbox').button("Collapse")
@@ -548,12 +585,12 @@ class GeneView(Pmw.Dialog):
             self.deactivate()
 
     def _set(self, VF, meta=''):
-        self.text.prettyPrint(VF, rightClick="variantMenu")#, meta=meta)
+        title = self._geneTitle(origVF.genes)
+        self.text.prettyPrint(VF, rightClick="variantMenu", label=title)
         
     def display(self, VF):#, meta=''):
         origVF = VF.copyAttributes()
         #self.meta = meta + '## GENE VIEW:\n## Viewing variants in: %s\n##\n' % ', '.join(origVF.genes)
-        self._setGeneTitle(origVF.genes)
         self._set(origVF)#, meta=self.meta)
         self.uncollapsedVF = origVF
         self.collapsedVF = None
@@ -561,15 +598,15 @@ class GeneView(Pmw.Dialog):
         self.collapseButton.configure(text='Collapse')
         FiltusUtils.activateInCenter(self.filtus.parent, self)
 
-    def _setGeneTitle(self, genes):
+    def _geneTitle(self, genes):
         if len(genes) == 1: 
             genetitle = genes[0]
         elif len(genes) < 15 and len(', '.join(genes)) < 50: 
             genetitle = ', '.join(genes)
         else: 
             genetitle = "%d selected genes"%len(genes)
-        self.text.configure(label_text = "Genes: " + genetitle)  
-
+        return genetilte
+        
         
 class VariantView(Pmw.Dialog):
     def __init__(self, filtus, title):
@@ -581,7 +618,7 @@ class VariantView(Pmw.Dialog):
         interior.columnconfigure(0, weight=1)
         interior.rowconfigure(1, weight=1)
         Tkinter.Label(interior, text=title, font=filtus.titlefont).grid(padx=20, pady=10)
-        self.text = FiltusText(self.interior(), filtus, label='')
+        self.text = FiltusText(self.interior(), filtus, labelpos='n')
         self.text.grid(padx=20, pady=20, sticky='news')
         
     def _doIt(self, button):
@@ -589,14 +626,13 @@ class VariantView(Pmw.Dialog):
         else: self.deactivate()
             
     def showVariant(self, vdef):
-        self.text.configure(label_text='Chromosome %s, position %s' %vdef)
         variantDat = FiltusAnalysis.genotypeData(vdef, self.filtus.files)
-        self.text.prettyPrint(variantDat, pad=5)
+        self.text.prettyPrint(variantDat, pad=5, label='Chromosome %s, position %s' %vdef)
         FiltusUtils.activateInCenter(self.filtus.parent, self)
 
         
 class SharingPage(object):
-    def __init__(self, notebook, filtus, title):
+    def __init__(self, notebook, filtus, title, manpage=None):
         self.notebook = notebook
         self.title = title
         self.page = notebook.add(title)
@@ -611,14 +647,15 @@ class SharingPage(object):
         self.buttonFrame = Tkinter.Frame(self.page)
         self.buttonFrame.columnconfigure(1, weight=1)
         self.button = Tkinter.Button(self.buttonFrame, text = "Analyze", command=self.analyze, pady=0)
+        self.button.grid(padx=75, pady=(5, 0))
         
         self.summary = Pmw.ScrolledText(self.page, text_height=2, labelpos='nw', label_text='Summary:', text_font=filtus.monofont,
                      text_width=1, borderframe=0, scrollmargin=0, vscrollmode='none', hscrollmode='none', text_wrap='none', text_padx=2, text_pady=5)
         
-        self.interior.grid(sticky='news')
-        self.buttonFrame.grid(sticky='news', pady=5)
-        self.button.grid(padx=75, pady=(5, 0))
-        self.summary.grid(padx=5, pady=(0, 5), sticky='news')
+        self.interior.grid(row=0, sticky='news')
+        HelpButton(self.page, filtus=filtus, page=manpage).grid(row=0, sticky="ne")
+        self.buttonFrame.grid(row=1, sticky='news', pady=5)
+        self.summary.grid(row=2, padx=5, pady=(0, 5), sticky='news')
 
         makeReadOnly(self.summary.component('text'))
 
@@ -667,10 +704,11 @@ class SharingPage(object):
 
             
 class GeneSharingPage(SharingPage):
-    def __init__(self, notebook, filtus, title, family=False):
-        SharingPage.__init__(self, notebook, filtus, title)
-        self.sharingComputer = FiltusAnalysis.GeneSharingComputer(genelengths=None)
+    def __init__(self, notebook, filtus, title, manpage=None, family=False):
+        SharingPage.__init__(self, notebook, filtus, title, manpage)
+        self.sharingComputer = FiltusAnalysis.GeneSharingComputer()
         self.family = family
+        self.genelengths = {}
         
         if not family:
             self.tableMaker = FiltusAnalysis.NgTable(self, count_what = 'genes') # not to be used if family = False
@@ -700,7 +738,7 @@ class GeneSharingPage(SharingPage):
         cases = self.readIDfield(self.cases, loadedFilenames)
         controls = self.readIDfield(self.controls, loadedFilenames)
         
-        if len(cases) == 0: # no 'cases' indicated
+        if len(cases) == 0: # if no 'cases' indicated
             raise ValueError("'Affected' field cannot be empty.")
         
         FiltusUtils.checkDuplicates([cases, controls])
@@ -708,10 +746,35 @@ class GeneSharingPage(SharingPage):
         self.confirmColumns([cases, controls], gene=True, genotype=(model!='Dominant'))
         VFcases=[loadedVFs[i] for i in cases]
         VFcontrols=[loadedVFs[i] for i in controls]
-        userInput = dict(VFcases=VFcases, VFcontrols=VFcontrols, model=model, family=self.family, VFcases_index=cases, VFcontrols_index=controls)
-        #userInput['genelengths'] = self.getAndFixGenelengths()
+        
+        # check if changes relevant for genelengths have been made, and if so update self.genelengths
+        self.updateGenelengths()
+        
+        userInput = dict(VFcases=VFcases, VFcontrols=VFcontrols, model=model, family=self.family, genelengths=self.genelengths,
+                         VFcases_index=cases, VFcontrols_index=controls)
         return userInput
     
+    def updateGenelengths(self):
+        genelengthBrowser = self.filtus.genelengthBrowser
+        candidBrowser = self.filtus.FM.candidate_genes
+        excluBrowser = self.filtus.FM.exclusion_genes
+        
+        # if no changes have been made, use previously generated data
+        if not any(x.modified for x in (genelengthBrowser, candidBrowser, excluBrowser)):
+            return self.genelengths
+        
+        # else, make from scratch
+        genelengths = genelengthBrowser.getcontent()
+        
+        keep = set(genelengths)
+        if candidBrowser.on():
+            keep.intersection_update(candidBrowser.getcontent())
+        if excluBrowser.on():
+            keep.difference_update(excluBrowser.getcontent())
+        
+        self.genelengths = {gene:length for gene,length in genelengths.iteritems() if gene in keep}
+        
+     
     def rightClickMenu(self, event):
         menu = Tkinter.Menu(self.filtus.parent, tearoff = 0, font = self.filtus.defaultfont)
         text = self.filtus.text
@@ -741,22 +804,6 @@ class GeneSharingPage(SharingPage):
             self.sharingGeneView = GeneView(filtus, title="Gene view of relevant variants in affected samples")
         self.sharingGeneView.display(varingens)
         
-    def getAndFixGenelengths(self):
-        return {} # TODO!
-        filtus = self.filtus
-        FM = filtus.FM
-        genelengths = filtus.genelengths.genelengths.copy() if hasattr(filtus, 'genelengths') else {}
-        if FM.candidate_genes.on() or FM.exclusion_genes.on():
-            keep = set(genelengths)
-            if FM.candidate_genes.on():
-                keep.intersection_update(FM.candidate_genes.getcontent())
-            if FM.exclusion_genes.on():
-                keep.difference_update(FM.exclusion_genes.getcontent())
-            for g in genelengths.keys():
-                if g not in keep:
-                    del genelengths[g]
-        self.genelengths = genelengths
-        
     def clear_more(self):
         self.model.setvalue('Dominant')
         self.shortcuts.setvalue([])
@@ -781,12 +828,12 @@ class GeneSharingPage(SharingPage):
         cumsum = [sum(shareCounts[i:]) for i in range(n)]
         self.summary.settext("Shared by    : " + "".join('%6d' %(i + 1,) for i in range(n)) + \
                            "\nGenes (cumul): " + "".join('%6d' %i for i in cumsum))    
-        self.filtus.text.prettyPrint(resultVF, rightClick = self.rightClickMenu)
+        self.filtus.text.prettyPrint(resultVF, rightClick = self.rightClickMenu, label="Gene sharing results")
         
                                   
 class VariantSharingPage(SharingPage):
-    def __init__(self, notebook, filtus, title):
-        SharingPage.__init__(self, notebook, filtus, title)
+    def __init__(self, notebook, filtus, title, manpage=None):
+        SharingPage.__init__(self, notebook, filtus, title, manpage)
         self.sharingComputer = FiltusAnalysis.VariantSharingComputer()
         
         self.tableMaker = FiltusAnalysis.NgTable(self, count_what='variants')
@@ -866,7 +913,7 @@ class VariantSharingPage(SharingPage):
         Pmw.alignlabels([self.allel1, self.allel12], sticky='e')
 
     def displayResult(self, resultVF):
-        self.filtus.text.prettyPrint(resultVF, rightClick = None)
+        self.filtus.text.prettyPrint(resultVF, rightClick = None, label="Variant sharing results")
         self.summary.settext("Variants found: %d" % resultVF.length)
         
     
@@ -1039,12 +1086,13 @@ class SummaryBox(LabeledListBox):
         filtus.busy()
         meta = FiltusUtils.preambleNY(VFlist=[VF], sort=False)
         rightClick = "variantMenu" if VF.isVCFtype else None
-        filtus.text.prettyPrint(VF, rightClick=rightClick, meta=meta) # OK to pass on meta in this case
+        labelstart =  'Unfiltered variants: ' if self._topString.get().startswith("Unfilt") else 'Variants after filtering: '
+        filtus.text.prettyPrint(VF, rightClick=rightClick, meta=meta, label=labelstart + VF.shortName) # OK to pass on meta in this case
         filtus.notbusy()
         
     
 class FilterMachine(Pmw.MegaWidget):
-    def __init__(self, parent, filtus, **kw):
+    def __init__(self, parent, filtus, manpage, **kw):
         # Define the megawidget options.
         optiondefs = ()
         self.defineoptions(kw, optiondefs)
@@ -1078,13 +1126,15 @@ class FilterMachine(Pmw.MegaWidget):
         for w in (self.interior(), groupi, cftitle, self.columnFrame):
             w.columnconfigure(0, weight=1)
         group.grid(sticky='news')
-        self.candidate_genes.grid(padx=(10, 5), pady=(0, 3), sticky='ew')
-        self.exclusion_genes.grid(padx=(10, 5), pady=3, sticky='ew')
-        self.exclusion_variants.grid(padx=(10, 5), pady=3, sticky='ew')
-        self.regions.grid(padx=(10, 5), pady=3, sticky='ew')
-        cftitle.grid(sticky='ew', padx=(10, 2))
-        self.columnFrame.grid(sticky='ew', pady=(0, 10))
-        self.applyButton.grid(sticky='n', pady=(0, 10))
+        self.candidate_genes.grid(row=0, padx=(10, 5), pady=(0, 3), sticky='ew')
+        self.exclusion_genes.grid(row=1, padx=(10, 5), pady=3, sticky='ew')
+        self.exclusion_variants.grid(row=2, padx=(10, 5), pady=3, sticky='ew')
+        self.regions.grid(row=3, padx=(10, 5), pady=3, sticky='ew')
+        cftitle.grid(row=4, sticky='ew', padx=(10, 2))
+        self.columnFrame.grid(row=5, sticky='ew', pady=(0, 10))
+        self.applyButton.grid(row=6, sticky='n', pady=(0, 10))
+        
+        HelpButton(groupi, filtus=filtus, page=manpage).grid(row=6, sticky="es")
         self.initialiseoptions()
 
         self._initColFilters(k=3)
@@ -1292,7 +1342,7 @@ class MultiFilter(object):
         summary2.clearAll()
         
         filtus.filteredFiles = []
-        for VF, VFfiltered, filter in zip(filtus.files, filters_ordered):
+        for VF, filter in zip(filtus.files, filters_ordered):
             if filter:
                 VFfilt = filter.apply(VF)
             else:
@@ -1651,43 +1701,30 @@ class VariantFile(FileBrowser):
         return res
     
     
-class GeneLengthFile(object):
-    def __init__(self, filtus, file=None):
-        self.filtus = filtus
-        self.genelengths = {}
-        if file:
-            self.read(file)
+class GeneLengthFile(FileBrowser):
+    def __init__(self, parent, filtus, **kw):
+        FileBrowser.__init__(self, parent, filtus, **kw)
 
-    def read(self, file):
+    @staticmethod
+    def read(file):
         file = os.path.normpath(file)
         res = {}
+        if not os.path.isfile(file):
+            raise IOError("Gene length file does not exist: %s."% file)
         try:
-            if os.path.isfile(file):
-                with open(file, 'rU') as f:
-                    for line in f:
-                        gen, length = line.split('\t')
+            with open(file, 'rU') as f:
+                for line in f:
+                    try:
+                        gen, length = line.split('\t')[:2]
                         res[gen] = int(length)
-                self.genelengths = res
-            else:
-                raise IOError("File does not exist: %s."%file)
+                    except ValueError:
+                        continue
             if not res:
                 raise IOError("Empty file: %s."%file)
-        except IOError as e:
-            FiltusUtils.warningMessage(e)
         except ValueError as e:
-            FiltusUtils.warningMessage("This gene length file does not have correct format (i.e. two tab-separated columns).\n\n%s"%e)
-
-    def browse(self):
-        file = tkFileDialog.askopenfilename(initialdir=self.filtus.currentDir, title="Select file with gene lengths")
-        if file:
-            self.filtus.currentDir = os.path.dirname(file)
-            self.read(file)
-            gl = self.genelengths
-            N = len(gl)
-            if N > 0:
-                FiltusUtils.infoMessage("Gene lengths data:\n\n%d genes\nMean length = %.1f"%(N, sum(gl.itervalues())/float(N)))
-
-
+            raise ValueError("Gene length file does not have correct format (i.e. two tab-separated columns).\n\n%s" % e)
+        return res
+  
 class GeneLookup(object):
     def __init__(self, parent, filtus):
         #self.genes = []
@@ -1760,10 +1797,13 @@ class AutEx_GUI(Pmw.Dialog):
     def __init__(self, filtus):
         
         Pmw.Dialog.__init__(self, filtus.parent, buttons = ('Compute','Close'), title = 'AutEx', defaultbutton=0,
-            command=self.execute, activatecommand=self._prepare, buttonbox_pady=10, dialogchildsite_pady=10)
-        interior = self.interior()
-        
+            command=self.execute, activatecommand=self._prepare, buttonbox_pady=10, dialogchildsite_pady=0)
         self.withdraw()
+        interior0 = self.interior()
+        interior = Tkinter.Frame(interior0) #self.interior()
+        interior.grid(row=0, column=0, pady=10, sticky='news')
+        HelpButton(interior0, filtus=filtus, page="autex").grid(row=0, column=0, sticky="ne")
+        
         self.filtus = filtus
         self.genmapfile = filtus.find_genmapfile()
         self.autexComputer = FiltusAnalysis.AutExComputer(genmapfile = self.genmapfile)
@@ -1883,7 +1923,7 @@ class AutEx_GUI(Pmw.Dialog):
             filtus.busy()
             params = self._readInput()
             segments = self.autexComputer.autex_segments(self.VF, **params)
-            filtus.text.prettyPrint(segments)
+            filtus.text.prettyPrint(segments, label="Autozygous segments of %s"%self.VF.shortName)
             
             summ = self.autexComputer.summary(segments)
             summ = {k:round(v, 4) for k,v in summ.iteritems()}
@@ -2053,7 +2093,7 @@ class PLINK_GUI(Pmw.Dialog):
             pedprefix = outprefix = 'filtus__plink__homozyg'
             dir = filtus.currentDir
             segments = self.plinkComputer.runPlink(self.VF, pedprefix=pedprefix, outprefix=outprefix, dir=dir, verbose=False, **params)
-            filtus.text.prettyPrint(segments)
+            filtus.text.prettyPrint(segments, label="PLINK homozygous segments for %s" %self.VF.shortName)
     
             summ = self.plinkComputer.summary(segments)
             summ = {k:round(v, 4) for k,v in summ.iteritems()}
@@ -2092,11 +2132,14 @@ class DeNovo_GUI(Pmw.Dialog):
     def __init__(self, filtus):
         
         Pmw.Dialog.__init__(self, filtus.parent, buttons = ('Compute','Close'), title = 'DeNovo', defaultbutton=0,
-            command=self.execute, activatecommand=self._prepare, buttonbox_pady=10, dialogchildsite_pady=10)
-        interior = self.interior()
-        interior.columnconfigure(0, weight=1)
-        
+            command=self.execute, activatecommand=self._prepare, buttonbox_pady=10, dialogchildsite_pady=0)
         self.withdraw()
+        interior0 = self.interior()
+        interior = Tkinter.Frame(interior0) #self.dialog.interior()
+        interior.columnconfigure(0, weight=1)
+        interior.grid(row=0, column=0, pady=10, sticky='news')
+        HelpButton(interior0, filtus=filtus, page="denovo").grid(row=0, column=0, sticky="ne")
+        
         self.filtus = filtus
         self.denovoComputer = FiltusAnalysis.DeNovoComputer()
         
@@ -2181,7 +2224,7 @@ class DeNovo_GUI(Pmw.Dialog):
             input = self._readInput()
             result = self.denovoComputer.analyze(**input) 
             self.summary.settext("%d variants found!\nVariants are shown in the main window." % result.length)
-            filtus.text.prettyPrint(result, rightClick="variantMenu")
+            filtus.text.prettyPrint(result, rightClick="variantMenu", label="De novo variants in %s"%input['VFch'].shortName)
             filtus.notbusy()
         except Exception as e:
             filtus.notbusy()

@@ -6,15 +6,18 @@
 
 PROGRAM_NAME = "FILTUS"
 VERSION = "0.99-95"
+MANUALDIR = "man"
 
 import time
 import Tkinter
 import Pmw
 import tkFont
 import tkFileDialog
+import webbrowser
 
 import gc
 import sys
+import os
 import os.path
 from math import copysign
 
@@ -38,9 +41,10 @@ except ImportError as e:
  
 
 class Filtus(object):
-    def __init__(self, parent, version):
+    def __init__(self, parent, version, manualdir):
         self.parent = parent
         self.version = version
+        self.manualdir = manualdir
         parent.title("FILTUS " + version)
         self.busyManager = BusyManager(parent)
         self.windowingsystem = parent.tk.call('tk', 'windowingsystem')
@@ -50,7 +54,7 @@ class Filtus(object):
         
         self.scrollframe = Pmw.ScrolledFrame(parent, borderframe=0, clipper_borderwidth=0, vertflex='expand', horizflex='expand')
         frame = self.scrollframe.interior()
-        frame.rowconfigure(2, weight=1)
+        frame.rowconfigure(3, weight=1)
         frame.columnconfigure(1, weight=1)
         self.frame = frame
     
@@ -76,7 +80,7 @@ class Filtus(object):
         self.currentFileNameList = []
         
         self.currentDir = ""
-        self.currentFileDir = ""
+        self.currentFileDir = os.getcwd()
         self.storage = {} # storage for  variant databases (to avoid reloading when filtering)
         
         ############## The file group
@@ -84,33 +88,27 @@ class Filtus(object):
         self.fileGroup.columnconfigure(0, weight=1)
 
         self.fileListbox = FiltusWidgets.LabeledListBox(self.fileGroup, filtus=self, toptext="Loaded files: 0", width=50)
+        self.fileListbox.component('bottomlabel').destroy()
         self.fileSummary1 = FiltusWidgets.SummaryBox(self.fileGroup, filtus=self, toptext="Unfiltered summaries", width=36)
         self.fileSummary2 = FiltusWidgets.SummaryBox(self.fileGroup, filtus=self, toptext="Filtered summaries", width=36)
 
         self.fileListbox.grid(sticky='new')
         self.fileSummary1.grid(row=0, column=1, sticky='nw', padx=(10, 0))
         self.fileSummary2.grid(row=0, column=2, sticky='nw', padx=(10, 0))
-        self.fileGroup.grid(sticky='news', columnspan=2, pady=(0, 10))
-
+        
         ############## The filter group
-        self.FM = FiltusWidgets.FilterMachine(frame, filtus=self)
-        self.FM.grid(sticky='new')
-
+        self.FM = FiltusWidgets.FilterMachine(frame, filtus=self, manpage="filters")
+        
+        ############## The big text field
+        self.text = FiltusWidgets.FiltusText(frame, filtus=self, labelpos='nw', label_font=self.smallfont)
+        
         ############ Sharing notebook
         self.sharingNotebook = Pmw.NoteBook(frame, arrownavigation=False, pagemargin=0)
-
-        self.gs = FiltusWidgets.GeneSharingPage(self.sharingNotebook, self, 'Gene sharing')
-        self.fs = FiltusWidgets.GeneSharingPage(self.sharingNotebook, self, 'Gene sharing fam', family=True)
-        self.vs = FiltusWidgets.VariantSharingPage(self.sharingNotebook, self, 'Variant sharing')
-        #self.dn = FiltusWidgets.DeNovoPage(self.sharingNotebook, self, 'De novo')
-        
+        self.gs = FiltusWidgets.GeneSharingPage(self.sharingNotebook, self, 'Gene sharing', manpage="genesharing")
+        self.fs = FiltusWidgets.GeneSharingPage(self.sharingNotebook, self, 'Gene sharing fam', manpage="familybased", family=True)
+        self.vs = FiltusWidgets.VariantSharingPage(self.sharingNotebook, self, 'Variant sharing', manpage="filtus")
         self.sharingNotebook.setnaturalsize()
-        self.sharingNotebook.grid(row=2, sticky='new', pady=(10, 0))
-
-        ############## The big text field
-        self.text = FiltusWidgets.FiltusText(frame, filtus=self)
-        self.text.grid(row=1, column=1, rowspan=2, sticky='news', padx=(20, 0), pady=(10, 0))
-
+        
         ###### Settings
         self.fileListbox.fixselectall()
         self.sepOutput = '\t'
@@ -118,13 +116,25 @@ class Filtus(object):
         self.makeSettingsDialog()
         self.settingsDialog.invoke()
 
-        self.makeMainMenu()
+        self.menuBar = self.makeMainMenu()
         self.menuBar.bind('<Triple-1>', self._run)
         self.parent.bind('<Shift-Return>', self._run)
 
-        self.scrollframe.component('clipper').configure(height=min(frame.winfo_height(), frame.winfo_screenheight()-50),
-                                                    width=min(frame.winfo_width(), frame.winfo_screenwidth()-50))
+        ########### Place on grid
+        self.fileGroup.grid(sticky='news', columnspan=2, pady=(0, 0))
+        self.FM.grid(row=1, column=0, pady=(10,0), sticky='new')
+        self.text.grid(row=1, column=1, rowspan=2, sticky='news', padx=(20, 0), pady=0)
+        self.sharingNotebook.grid(row=2, sticky='new', pady=(10, 0))
+
+        # on parent grid
+        self.menuBar.grid(row=0, column=0, sticky='ew')
         self.scrollframe.grid(row=1, sticky='news', padx=20, pady=(10, 20))
+        
+        print frame.winfo_height()
+        print frame.winfo_width()
+        parent.update_idletasks()
+        self.scrollframe.component('clipper').configure(height=min(frame.winfo_height(), frame.winfo_screenheight()-100),
+                                                    width=min(frame.winfo_width()+200, frame.winfo_screenwidth()-100)) # the 200 is ad hoc to increase startup width a little
         if PLOT_error:
             FiltusUtils.warningMessage("Plotting functionality is disabled. Error message:\n\n%s\n\nNote: On MAC and Linux the modules 'numpy' and 'matplotlib' must be installed separately to make the plots work.\nSee also Filtus homepage: http://folk.uio.no/magnusv/filtus.html"%PLOT_error)
         
@@ -174,11 +184,18 @@ class Filtus(object):
         self.generalfontSizeEntry.grid(**grid_OPTIONS)
         self.textfontSizeEntry.grid(**grid_OPTIONS)
 
-        self.otherGroup = Pmw.Group(self.settingsDialog.interior(), tag_text='Other settings')
+        self.textGroup = Pmw.Group(self.settingsDialog.interior(), tag_text='Main text area')
         counter_OPTIONS.update(dict(entryfield_value=self.truncate, entryfield_validate=dict(validator='integer', min='0', max='1000')))
-        self.truncateEntry = Pmw.Counter(self.otherGroup.interior(), label_text="Truncate columns wider than:", **counter_OPTIONS)
+        self.truncateEntry = Pmw.Counter(self.textGroup.interior(), label_text="Truncate columns wider than:", **counter_OPTIONS)
         self.truncateEntry.grid(**grid_OPTIONS)
-        for g in [self.outputGroup, self.fontGroup, self.otherGroup]:
+        
+        self.genelengthGroup = Pmw.Group(self.settingsDialog.interior(), tag_text='Gene lengths')
+        self.genelengthBrowser = FiltusWidgets.GeneLengthFile(self.genelengthGroup.interior(), filtus=self, browsesticky='se', checkbutton=0, browsetitle = 'Select gene length file', 
+                    value = "example_files/genelengths.txt", label = "Gene lengths file:", labelpos='nw')
+        self.genelengthBrowser.modified = 1 # otherwise the file wont be read.
+        self.genelengthBrowser.grid(**grid_OPTIONS)
+        
+        for g in [self.outputGroup, self.fontGroup, self.textGroup, self.genelengthGroup]:
             g.interior().columnconfigure(0, weight=1)
             g.configure(ring_borderwidth=1)
             g.configure(tag_font = self.smallbold)
@@ -233,8 +250,8 @@ class Filtus(object):
         menuBar.addmenuitem('Analysis', 'separator')
         menuBar.addmenuitem('Analysis', 'command', None, command=self.denovo_prompt, label="De novo variant detection", font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'separator')
-        #menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_pair_prompt, label="Pairwise relatedness", font=self.defaultfont)
-        #menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_trio_prompt, label="Trio relatedness", font=self.defaultfont)
+        menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_pair_prompt, label="Pairwise relatedness", font=self.defaultfont)
+        menuBar.addmenuitem('Analysis', 'command', None, command=self.relatedness_trio_prompt, label="Trio relatedness", font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'command', None, command=self.pairwiseSharing, label='Pairwise variant sharing', font=self.defaultfont)
         menuBar.addmenuitem('Analysis', 'separator')
         menuBar.addmenuitem('Analysis', 'command', None, command=self.QC_prompt, label='QC plots', font=self.defaultfont) 
@@ -248,12 +265,22 @@ class Filtus(object):
         menuBar.addmenuitem('Database', 'command', None, command=self.database_prompt(3), label='Search database', font=self.defaultfont)
 
         menuBar.addmenu('Settings', None)
-        menuBar.addmenuitem('Settings', 'command', None, command=self.genelengths_prompt, label='Gene lengths', font=self.defaultfont)
-        menuBar.addmenuitem('Settings', 'separator')
-        menuBar.addmenuitem('Settings', 'command', None, label='Preferences', command=self.settingsPrompt, font=self.defaultfont)
-        menuBar.grid(row=0, column=0, sticky='ew')
-        self.menuBar = menuBar
-
+        #menuBar.addmenuitem('Settings', 'command', None, command=self.genelengths_prompt, label='Gene lengths', font=self.defaultfont)
+        #menuBar.addmenuitem('Settings', 'separator')
+        menuBar.addmenuitem('Settings', 'command', None, label='Edit settings', command=self.settingsPrompt, font=self.defaultfont)
+        
+        # Help menu
+        menuBar.addmenu('Help', None, side='right')
+        menuBar.addmenuitem('Help', 'command', None, command=self.openUserManual, label='Browse help pages', font=self.defaultfont)
+        return menuBar
+        
+    def openWebPage(self, pageadress):
+        webbrowser.open(pageadress)
+        
+    def openUserManual(self):
+        path = os.path.abspath(os.path.join(self.manualdir, 'usermanual.html'))
+        self.openWebPage(path)
+    
     def busy(self):
         self.busyManager.busy()
     
@@ -319,7 +346,7 @@ class Filtus(object):
         FiltusUtils.activateInCenter(self.parent, self.plinkgui)
 
     def denovo_prompt(self):
-        if not self.checkLoadedSamples(select="all", VF=False, minimum=1, maximum=1):
+        if not self.checkLoadedSamples(select="all", VF=False, minimum=3):
             return
         if not hasattr(self, 'denovogui'):
             self.denovogui = FiltusWidgets.DeNovo_GUI(self)
@@ -415,7 +442,7 @@ class Filtus(object):
             if not VFlist: return
             try:
                 mergedVF = FiltusAnalysis.merge(VFlist, collapse=collapse)
-                self.text.prettyPrint(mergedVF)
+                self.text.prettyPrint(mergedVF, label='')
             except Exception as e:
                 FiltusUtils.warningMessage(e)
         return _m
@@ -586,7 +613,7 @@ class Filtus(object):
         def _f():
             files = self.checkLoadedSamples(select="all", VF=True, filtered=True)
             s = summarizer.summarize(files, col)
-            self.text.prettyPrint(s)
+            self.text.prettyPrint(s, label="Summary of column '%s'"%col)
         return _f
         
 class BusyManager(object):
@@ -633,7 +660,7 @@ class BusyManager(object):
         self.isBusy = False
 
 root = Pmw.initialise()
-filtus = Filtus(root, version=VERSION)
+filtus = Filtus(root, version=VERSION, manualdir=MANUALDIR)
 #root.mainloop() # moved to bottom of file
 
 
@@ -679,8 +706,8 @@ if __name__ == "__main__":
         gs, vs = filtus.gs, filtus.vs
         gs.cases.setvalue('1,2')
         gs.button.invoke()
-        vs.fields[4].setvalue('1,2')
-        vs.button.invoke()
+        #vs.fields[4].setvalue('1,2')
+        #vs.button.invoke()
         print "ok"
         
     def test_denovo():

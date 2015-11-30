@@ -54,9 +54,13 @@ class InputDialog(object):
     def _createDialog(self):
         self.dialog = Pmw.Dialog(self.parent, buttons = ('Use for all files', 'Use for this file', 'Skip this file', 'Cancel'),
                             defaultbutton = 0, title = 'Input file settings', command=self._executeDialogButton,
-                            dialogchildsite_pady=10, buttonbox_pady=10)
+                            dialogchildsite_pady=0, buttonbox_pady=10)
         self.dialog.withdraw()
-        fr = self.dialog.interior()
+        interior0 = self.dialog.interior()
+        fr = Tkinter.Frame(interior0) #self.dialog.interior()
+        fr.grid(row=0, column=0, pady=10, sticky='news')
+        FiltusWidgets.HelpButton(interior0, filtus=self.filtus, page="loading", bookmark="inputsettings").grid(row=0, column=0, sticky="ne")
+        
         OM = FiltusWidgets.OptionMenuExt
         filename_group = Pmw.Group(fr, tag_text = 'File name')
         self.fileLabel = Tkinter.Label(filename_group.interior(), justify = "left", font = self.filtus.textfont)
@@ -143,17 +147,6 @@ class InputDialog(object):
         self.prefilter_operatorOM.grid(row=0, column=0, **grid_nw)
         self.prefilter_valueEntry.grid(row=0, column=1, sticky='nwe', padx=(0, 10), pady=2)
         
-        #self.startupFilter = FiltusWidgets.FileBrowser(filter_interior, 
-        #    filtus=self.filtus, label="Apply filter file:", checkbutton=False,
-        #    entryfield_labelmargin=10, browsetitle="Select filter configuration file")
-        #self.startupFilter.component('entryfield').configure(command=None)
-        #self.startupModel = FiltusWidgets.ModelSelect(filter_interior, labelmargin=5)
-        #self.closePairs = Pmw.Counter(filter_interior, label_text = "Remove variant pairs closer than (bp):", entry_width=4,
-                                    #entryfield_validate = {'validator' : 'integer', 'min' : '0', 'max' : '1000'},
-                                    #entryfield_value = 0, entry_justify = 'center', datatype = 'integer', **pmw_OPTIONS)
-        #self.startupFilter.grid(sticky='news', padx=10, pady=2)
-        #self.startupModel.grid(**grid_nw)
-        #self.closePairs.grid(**grid_nw)
         for g in (filename_group, basic_group, variant_group, split_group, prefilter_group):
             g.configure(ring_borderwidth=1, tag_font = self.filtus.smallbold)
             g.grid(sticky='news', pady=6, padx=10, ipady=2)

@@ -6,7 +6,9 @@ import time
 import tkFileDialog
 import random
 
-import numpy as np
+#import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.collections as mplcol
 import matplotlib.transforms as mpltransforms
@@ -26,9 +28,14 @@ class QC(object):
         filtus = self.filtus
         self.dialog = Pmw.Dialog(self.parent, title='Quality plots', buttons=('Close',), activatecommand=self._prepare, command=self._executeDialogButton, dialogchildsite_pady=5, buttonbox_pady=10)
         self.dialog.withdraw()
-        fr = self.dialog.interior()
+        interior0 = self.dialog.interior()
+        fr = Tkinter.Frame(interior0) #self.dialog.interior()
         fr.columnconfigure(0, weight=1)
         fr.rowconfigure(1, weight=1)
+        fr.grid(row=0, column=0, pady=10, sticky='news')
+        FiltusWidgets.HelpButton(interior0, filtus=filtus, page="qcplots").grid(row=0, column=0, sticky="ne")
+        
+        #fr = self.dialog.interior()
         Tkinter.Label(fr, text="QUALITY CONTROL PLOTS", font=filtus.titlefont).grid(sticky='news', pady=8)
         
         button_OPTIONS = dict(menubutton_anchor = 'w', menubutton_padx=5, menubutton_pady=1, menubutton_width=9, labelmargin=5, menu_font = filtus.defaultfont)
