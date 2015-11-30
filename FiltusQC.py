@@ -251,7 +251,7 @@ def histogramPlot(VFlist, column, bins, NA_vals = ('', 'NA', '.', '-'), save=Non
     
 def homPlot(pos, obs, scores, freqs, title='', segs=None, save=None, show=True):
     fig = plt.figure(figsize=(14, 6))
-    ax = fig.add_subplot(1, 1, 0)
+    ax = fig.add_subplot(1, 1, 1)
     obs_jit = [0.4*gt + 0.18*fr + random.random()*0.02 for gt,fr in zip(obs, freqs)]
     ax.plot(pos, obs_jit, 'bo')
     ax.plot(pos, scores, 'r-')
@@ -271,7 +271,7 @@ def homPlot(pos, obs, scores, freqs, title='', segs=None, save=None, show=True):
     
 def homPlotSimple(pos, obs, title='', segs=None, save=None, show=True): # plink plot, without scores and frequencies
     fig = plt.figure(figsize=(14, 6))
-    ax = fig.add_subplot(1, 1, 0)
+    ax = fig.add_subplot(1, 1, 1)
     obs_jit = [0.4*gt + random.random()/5 for gt in obs]
     ax.plot(pos, obs_jit, 'bo')
     ax.add_collection(mplcol.BrokenBarHCollection([(s[0], s[2]*1.0e6) for s in segs], (0,1), facecolor='green', alpha=0.2))
