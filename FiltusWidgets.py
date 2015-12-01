@@ -436,6 +436,7 @@ class FiltusText(Pmw.ScrolledText):
     def clearAll(self):
         self.clear()
         self.columnheader.delete('1.0', 'end')
+        self.setlabel('')
         self.currentColDat = None
         self.headers = None
         self._setRightClickMenu(None)
