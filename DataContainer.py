@@ -71,6 +71,7 @@ class ColumnData(object):
 
     def sort(self, column, descending=False, stringsFirst=False): 
         getCol = self.columnGetter(column)
+        if not getCol: return
         tryFloat = FiltusUtils.tryFloat
         stringval = float('inf')
         if descending: stringval = -stringval
@@ -165,7 +166,6 @@ class GeneSharingResult(ColumnData):
         
         # Average number of variants (after filt) per sample:
         m_aver = sum(g.length for g in geneMaster.itervalues())/float(nSamples) 
-        print 'datacontainer geneMaster, m_aver=', m_aver
         
         for gene in geneMaster.keys():
             geneData = geneMaster[gene]

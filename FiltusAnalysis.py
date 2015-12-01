@@ -419,16 +419,10 @@ class GeneSharingComputer(object):
         #self.genelengths = {}
         
     def analyze(self, VFcases, VFcontrols, model, family, VFcases_index=None, VFcontrols_index=None, minSampleCount=1, genelengths=None):
-        print 'genelengths', len(genelengths)
-        
-        intlist2string, pValue = FiltusUtils.intlist2string, FiltusUtils.pValue
-        #M, totL = self.M, self.totL
-        n = len(VFcases)
+        intlist2string = FiltusUtils.intlist2string
         
         filter = Filter.Filter(model=model, controls=VFcontrols, benignPairs=None if family else True)
         VFcases_filt = [filter.apply(VF) for VF in VFcases]
-        m_aver = sum(vf.nVars(diploid=True) for vf in VFcases_filt)/float(n) 
-        print 'genesharing computer, m_aver=', m_aver
         
         VFcases_index = list(VFcases_index) if VFcases_index else range(len(VFcases))
         if VFcontrols_index:
@@ -489,8 +483,10 @@ class GeneSharingComputer(object):
         if minSampleCount > 1: 
             analys_txt += "\n## Minimum number of affected: %d" % minSampleCount
         meta = FiltusUtils.preambleNY(VFlist=VFcases+VFcontrols, VFindex=VFcases_index+VFcontrols_index, analysis=analys_txt)
-        result = DataContainer.GeneSharingResult.geneMaster(gD, nSamples=n, minSampleCount=minSampleCount, genelengths=genelengths, model=model, meta=meta)
+        result = DataContainer.GeneSharingResult.geneMaster(gD, nSamples=len(VFcases), minSampleCount=minSampleCount, 
+                                                            genelengths=genelengths, model=model, meta=meta)
         result.sort(column='SampleCount', descending=True)
+        result.sort(column='P_raw', ascending=True)
         return result
     
     # def readGenelengths(self, file):
