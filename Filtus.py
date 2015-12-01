@@ -5,15 +5,7 @@
 #----------------------------------------------------------------
 
 PROGRAM_NAME = "FILTUS"
-VERSION = "0.99-95"
-MANUALDIR = "man"
-
-import time
-import Tkinter
-import Pmw
-import tkFont
-import tkFileDialog
-import webbrowser
+VERSION = "0.99-96"
 
 import gc
 import sys
@@ -21,9 +13,23 @@ import os
 import os.path
 from math import copysign
 
+if os.path.isdir("man"):
+    MANUALDIR = os.path.abspath("man")
+    DATADIR = os.path.abspath("data")
+elif os.path.isdir("../man"):
+    MANUALDIR = os.path.abspath("../man")
+    DATADIR = os.path.abspath("../data")
+    
 if sys.version_info[:2] != (2,7):
     print "Python 2.7 is needed to run Filtus. Your Python version is %d.%d.%d" %sys.version_info[:3]
     sys.exit(0)
+
+import time
+import Tkinter
+import Pmw
+import tkFont
+import tkFileDialog
+import webbrowser
 
 import FiltusWidgets
 import FiltusDatabase
@@ -40,12 +46,13 @@ except ImportError as e:
     PLOT_error = e
  
 
-class Filtus(object):
-    def __init__(self, parent, version, manualdir):
+class FiltusGUI(object):
+    def __init__(self, parent):
         self.parent = parent
-        self.version = version
-        self.manualdir = manualdir
-        parent.title("FILTUS " + version)
+        self.version = VERSION
+        self.manualdir = MANUALDIR
+        self.datadir = DATADIR
+        parent.title("FILTUS " + self.version)
         self.busyManager = BusyManager(parent)
         self.windowingsystem = parent.tk.call('tk', 'windowingsystem')
         self.rightclickevents = ['<2>', '<Control-1>'] if self.windowingsystem == 'aqua' else ['<3>']
@@ -54,7 +61,7 @@ class Filtus(object):
         
         self.scrollframe = Pmw.ScrolledFrame(parent, borderframe=0, clipper_borderwidth=0, vertflex='expand', horizflex='expand')
         frame = self.scrollframe.interior()
-        frame.rowconfigure(3, weight=1)
+        frame.rowconfigure(2, weight=1)
         frame.columnconfigure(1, weight=1)
         self.frame = frame
     
@@ -189,7 +196,7 @@ class Filtus(object):
         
         self.genelengthGroup = Pmw.Group(self.settingsDialog.interior(), tag_text='Gene lengths')
         self.genelengthBrowser = FiltusWidgets.GeneLengthFile(self.genelengthGroup.interior(), filtus=self, browsesticky='se', checkbutton=0, browsetitle = 'Select gene length file', 
-                    value = "example_files/genelengths.txt", label = "Gene lengths file:", labelpos='nw')
+                    value = os.path.join(self.datadir, "genelengths.txt"), label = "Gene lengths file:", labelpos='nw')
         self.genelengthBrowser.modified = 1 # otherwise the file wont be read.
         self.genelengthBrowser.grid(**grid_OPTIONS)
         
@@ -276,7 +283,7 @@ class Filtus(object):
         webbrowser.open(pageadress)
         
     def openUserManual(self):
-        path = os.path.abspath(os.path.join(self.manualdir, 'usermanual.html'))
+        path = os.path.join(self.manualdir, 'usermanual.html')
         self.openWebPage(path)
     
     def busy(self):
@@ -427,11 +434,6 @@ class Filtus(object):
             self.genelengths = FiltusWidgets.GeneLengthFile(self)
         self.genelengths.browse()
 
-    def find_genmapfile(self): # Find and parse file with recombination map
-        decodeFile = "DecodeMap_thin.txt"
-        decode_trypaths = [os.path.join(direc, decodeFile) for direc in ("..", "example_files", "../example_files")]
-        return next((p for p in decode_trypaths if os.path.isfile(p)), None)
-        
     def mergeCommand(self, collapse):
         def _m():
             VFlist = self.checkLoadedSamples(select="selection", minimum=2)
@@ -656,7 +658,7 @@ class BusyManager(object):
         self.isBusy = False
 
 root = Pmw.initialise()
-filtus = Filtus(root, version=VERSION, manualdir=MANUALDIR)
+filtus = FiltusGUI(root)
 #root.mainloop() # moved to bottom of file
 
 

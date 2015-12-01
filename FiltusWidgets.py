@@ -27,7 +27,7 @@ class HelpButton(Tkinter.Button):
         self.filtus = filtus
         if font is None: font=filtus.defaultfont
         Tkinter.Button.__init__(self, parent, text=text, font=font, padx=2, pady=0, bd=1, height=1, highlightthickness=0, command=self.showInBrowser)
-        self.pagepath = os.path.abspath(os.path.join(filtus.manualdir, page + '.html'))
+        self.pagepath = os.path.join(filtus.manualdir, page + '.html')
         if bookmark is not None:
             self.pagepath += '#%s'%bookmark
             
@@ -220,7 +220,7 @@ class PedWriter(Pmw.Dialog):
             if map and not any(maptype):
                 raise RuntimeError('At least one of the "Map options" must be checked')
             
-            genmapfile = filtus.find_genmapfile() if 'cm' in maptype else None
+            genmapfile = os.path.join(filtus.datadir, "DecodeMap_thin.txt") if 'cm' in maptype else None
             prefix = self.prefixEntry.getvalue()
             dir = self.dirBrowser.getvalue().strip()
             if not os.path.isdir(dir): raise os.error("Not a valid directory: %s" %dir)
@@ -1805,7 +1805,10 @@ class AutEx_GUI(Pmw.Dialog):
         HelpButton(interior0, filtus=filtus, page="autex").grid(row=0, column=0, sticky="ne")
         
         self.filtus = filtus
-        self.genmapfile = filtus.find_genmapfile()
+        self.genmapfile = os.path.join(filtus.datadir, "DecodeMap_thin.txt")
+        if not os.path.isfile(self.genmapfile): 
+            print "File 'DecodeMap_thin.txt' not found"
+            self.genmapfile = None
         self.autexComputer = FiltusAnalysis.AutExComputer(genmapfile = self.genmapfile)
         self.VF = None
         
