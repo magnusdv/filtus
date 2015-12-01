@@ -12,14 +12,7 @@ import sys
 import os
 import os.path
 from math import copysign
-
-if os.path.isdir("man"):
-    MANUALDIR = os.path.abspath("man")
-    DATADIR = os.path.abspath("data")
-elif os.path.isdir("../man"):
-    MANUALDIR = os.path.abspath("../man")
-    DATADIR = os.path.abspath("../data")
-    
+ 
 if sys.version_info[:2] != (2,7):
     print "Python 2.7 is needed to run Filtus. Your Python version is %d.%d.%d" %sys.version_info[:3]
     sys.exit(0)
@@ -50,9 +43,17 @@ class FiltusGUI(object):
     def __init__(self, parent):
         self.parent = parent
         self.version = VERSION
-        self.manualdir = MANUALDIR
-        self.datadir = DATADIR
         parent.title("FILTUS " + self.version)
+        
+        if os.path.isdir("man"):
+            self.manualdir = os.path.abspath("man")
+            self.datadir = os.path.abspath("data")
+        elif os.path.isdir("../man"):
+            self.manualdir = os.path.abspath("../man")
+            self.datadir = os.path.abspath("../data") 
+        else:
+            self.manualdir, self.datadir = None, None
+        
         self.busyManager = BusyManager(parent)
         self.windowingsystem = parent.tk.call('tk', 'windowingsystem')
         self.rightclickevents = ['<2>', '<Control-1>'] if self.windowingsystem == 'aqua' else ['<3>']
