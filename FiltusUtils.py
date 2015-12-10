@@ -182,8 +182,10 @@ def chromInt(s):
 
 def XminusPAR(vdef):
         '''input: (chr, pos), both strings'''
-        chr, pos = chromInt(vdef[0]), int(vdef[1])
-        return chr==23 and not (60000<pos<2699521 or 154931043<pos<155270561) #X:0-60000; X:2699521-154931043; X:155270561-1e9
+        if chromInt(vdef[0]) == 23:
+            pos = int(vdef[1])
+            return not (60000<pos<2699521 or 154931043<pos<155270561) #X:0-60000; X:2699521-154931043; X:155270561-1e9
+        return False
         
 def string2intlist(txt, idlist=None):
     #example: '1, 4-6, 8-10' --> [1, 4, 5, 6, 8, 9, 10]
