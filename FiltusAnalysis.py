@@ -555,7 +555,7 @@ class DeNovoComputer(object):
         if X and boy:
             T = [[[log10(trioTransmit(m, father, mother, ch, X=1, boy=1)) for ch in alleles] for mother in gt] for father in alleles]
         elif X and not boy:
-            T = [[[log10(trioTransmit(m, father, mother, ch, X=1, boy=0)) for ch in alleles] for mother in gt] for father in gt]
+            T = [[[log10(trioTransmit(m, father, mother, ch, X=1, boy=0)) for ch in gt] for mother in gt] for father in alleles]
         else:
             T = [[[log10(trioTransmit(m, father, mother, ch, X=0)) for ch in gt] for mother in gt] for father in gt]
         return T
@@ -785,6 +785,7 @@ class DeNovoComputer(object):
                 post_txt = '%.4f'%post
             
             except Exception as e:
+                print 'EXCEP!'
                 print type(e).__name__, '%s: '%e
                 post_txt = '-'
             
