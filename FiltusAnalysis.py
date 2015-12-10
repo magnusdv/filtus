@@ -486,7 +486,7 @@ class GeneSharingComputer(object):
         result = DataContainer.GeneSharingResult.geneMaster(gD, nSamples=len(VFcases), minSampleCount=minSampleCount, 
                                                             genelengths=genelengths, model=model, meta=meta)
         result.sort(column='SampleCount', descending=True)
-        result.sort(column='P_raw', ascending=True)
+        result.sort(column='P_raw', descending=False)
         return result
     
     # def readGenelengths(self, file):
@@ -785,7 +785,6 @@ class DeNovoComputer(object):
                 post_txt = '%.4f'%post
             
             except Exception as e:
-                print 'EXCEP!'
                 print type(e).__name__, '%s: '%e
                 post_txt = '-'
             

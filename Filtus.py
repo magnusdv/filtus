@@ -5,7 +5,7 @@
 #----------------------------------------------------------------
 
 PROGRAM_NAME = "FILTUS"
-VERSION = "0.99-96"
+VERSION = "1.0.0"
 
 import gc
 import sys
@@ -666,10 +666,10 @@ filtus = FiltusGUI(root)
 if __name__ == "__main__":
     
     printVF = FiltusAnalysis._printVF
-    test_csv = ["..\\..\\Testfiles\\test%d.csv" %i for i in (1,2)]
-    test_vcf = "..\\..\\Testfiles\\vcf_example.vcf"
+    test_csv = ["example_files\\test%d.csv" %i for i in (1,2)]
+    test_vcf = "example_files\\vcf_test.vcf"
     controltrio = "C:\\testfiles\\trioControl\\hg002_hg003_hg004.hg19_multianno.hgmd.header.txt"
-    #controltrio = "example_files\\trio1000.vcf"
+    test_trio = "example_files\\trioHG002_22X.vcf"
     
     def test_version():
         '''checks that the correct version number is used when saving output files'''
@@ -706,8 +706,6 @@ if __name__ == "__main__":
         gs, vs = filtus.gs, filtus.vs
         gs.cases.setvalue('1,2')
         gs.button.invoke()
-        #vs.fields[4].setvalue('1,2')
-        #vs.button.invoke()
         print "ok"
         
     def test_denovo():
@@ -716,7 +714,7 @@ if __name__ == "__main__":
         dn = FiltusWidgets.DeNovo_GUI(filtus)
         dn2 = FiltusAnalysis.DeNovoComputer()
         
-        filtus.loadFiles([controltrio], guess=1, prompt=0, splitAsInfo="", formatCol="VCF_FORMAT", keep00=1, geneCol='Gene.refGene')
+        filtus.loadFiles([test_trio], guess=1, prompt=0, splitAsInfo="", keep00=1)
         frCol = '1000g2014oct_all'
         
         dn = FiltusWidgets.DeNovo_GUI(filtus)
@@ -736,7 +734,7 @@ if __name__ == "__main__":
         ch, fa, mo = filtus.files
         st = time.time()
         res2 = dn2.analyze(VFch=ch, VFfa=fa, VFmo=mo, boygirl="Boy", trioID=[0,1,2], mut=1e-8, threshold =0.00, defaultFreq=0.1, altFreqCol=frCol, minALTchild=None, maxALTparent=None)
-        print time.time()-st
+        #print time.time()-st
         assert res1.length == res2.length
         assert all(a[0]==b[0] for a,b in zip(res1.variants, res2.variants))
         print "ok"
@@ -744,18 +742,18 @@ if __name__ == "__main__":
     def test_autex():
         print "Testing Autex........",
         filtus.clearAll()
-        filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
+        filtus.loadFiles([test_trio], guess=1, prompt=0, splitAsInfo="", keep00=1)
         filtus.fileListbox.selection_set(0)
         filtus.autexgui = FiltusWidgets.AutEx_GUI(filtus)
         filtus.autexgui._prepare()
-        altfreq, deffreq, thresh, length, unit, n = '1000g2012apr_all', 0.05, 0.1, 0.1, 'Mb', 20
+        altfreq, deffreq, thresh, length, unit, n = '1000g2014oct_all', 0.05, 0.1, 0.1, 'Mb', 20
         for w, val in zip(('_altFreqMenu', '_def_freq_entry', '_thresh_entry', '_minlength_entry', '_unitmenu', '_mincount_entry'), (altfreq, deffreq, thresh, length, unit, n)):
             getattr(filtus.autexgui, w).setvalue(str(val))
         
         filtus.autexgui.execute("Compute")
         res1 = filtus.text.currentColDat
         
-        autex = FiltusAnalysis.AutExComputer(genmapfile="example_files\\DecodeMap_thin.txt")
+        autex = FiltusAnalysis.AutExComputer(genmapfile="data\\DecodeMap_thin.txt")
         res2 = autex.autex_segments(filtus.files[0], f=0.01, a=.5, error=0.005, defaultFreq=deffreq, altFreqCol=altfreq, threshold=thresh, minlength=length, unit=unit, mincount=n)
         
         assert res1.length == res2.length
@@ -766,17 +764,19 @@ if __name__ == "__main__":
     def test_qc():
         print "Testing QC........",
         filtus.clearAll()
-        filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
+        filtus.loadFiles([test_trio], guess=1, prompt=0, splitAsInfo="", keep00=1)
         QC = FiltusQC.QC(filtus)
         QC._prepare()
-        QC.save_browser.setvalue("..\\..\\kast.txt")
+        QC.save_browser.setvalue("_kast.txt")
         QC.save_browser.select()
         QC.scatter_x.setvalue("DP")
-        QC.scatter_y.setvalue("vcf_qual")
-        QC.histo_var.setvalue("caddgt10")
-        QC._executeDialogButton("Ok")
+        QC.scatter_y.setvalue("VCF_QUAL")
+        QC.histo_var.setvalue("1000g2014oct_all")
+        QC._comparativeButtonExecute()
         QC._scatterButtonExecute()
         QC._histogramButtonExecute()
+        QC._executeDialogButton("Ok") # why??
+        os.remove("_kast.txt")
         filtus.QC = QC
         filtus.QC_prompt()
         print "ok"
@@ -795,6 +795,7 @@ if __name__ == "__main__":
         filtus.loadFiles(test_csv[:1], guess=1, prompt=0, geneCol="Gene", splitAsInfo="")
         variants = FiltusAnalysis.geneLookup(["KIAA1751", "_FOO_"], VFlist=filtus.files)
         variants.save("_kast.txt")
+        os.remove("_kast.txt")
         assert variants.length == 4 == variants.collapse().length
         filtus.loadFiles(test_csv, guess=1, prompt=0, geneCol="Gene", splitAsInfo="", prefilter=("do not contain", "_foo_"))
         variants = FiltusAnalysis.geneLookup(["KIAA1751", "_FOO_"], VFlist=filtus.files)
@@ -814,7 +815,7 @@ if __name__ == "__main__":
     def test_plink():
         print "Testing plink........",
         filtus.clearAll()
-        filtus.loadFiles([triotest], guess=1, prompt=0, keep00=1, splitAsInfo="")
+        filtus.loadFiles([test_trio], guess=1, prompt=0, keep00=1, splitAsInfo="")
         filtus.fileListbox.selection_set(0)
         filtus.plinkgui = FiltusWidgets.PLINK_GUI(filtus)
         filtus.plinkgui._prepare()
@@ -832,7 +833,7 @@ if __name__ == "__main__":
             test_geneloopkup()
             test_sharing()
             test_qc()
-            test_plink()
+            #test_plink()
             test_autex()
             print 'all tests passed'
         else:
