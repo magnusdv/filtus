@@ -2163,9 +2163,15 @@ class DeNovo_GUI(Pmw.Dialog):
         self.child = Pmw.EntryField(trio_interior, label_text = "Child:", entry_justify="left", **entry_opt)#, modifiedcommand=self._setFreqCols)
         self.father = Pmw.EntryField(trio_interior, label_text = "Father:", entry_justify="left", **entry_opt)
         self.mother = Pmw.EntryField(trio_interior, label_text = "Mother:", entry_justify="left", **entry_opt)
+        self.boygirl = Pmw.RadioSelect(trio_interior, label_text = "Child gender:", labelpos='w', buttontype = 'radiobutton', orient = 'horizontal')
+        self.boygirl.add("Boy")
+        self.boygirl.add("Girl")
+        self.boygirl.invoke("Girl")
+        
         self.child.grid(row=0, column=0, **grid_opt)
         self.father.grid(row=0, column=1, **grid_opt)
         self.mother.grid(row=0, column=2, **grid_opt)
+        self.boygirl.grid(row=1, column=0, columnspan=3, **grid_opt)
         
         mut_group = Pmw.Group(interior, tag_text = 'Mutation rate')
         mut_interior = mut_group.interior()
@@ -2261,6 +2267,7 @@ class DeNovo_GUI(Pmw.Dialog):
         ch_fa_mo_flatten = [a[0] for a in ch_fa_mo]
         VFch, VFfa, VFmo = [loadedVFs[i] for i in ch_fa_mo_flatten]
         
+        boygirl = self.boygirl.getvalue()
         threshold = float(self._thresh_entry.getvalue()) if self._thresh_entry.getvalue() else None 
         minALTchild = float(self._minALTchild_entry.getvalue()) if self._minALTchild_entry.getvalue() else None 
         maxALTparent = float(self._maxALTparent_entry.getvalue()) if self._maxALTparent_entry.getvalue() else None 
@@ -2275,5 +2282,5 @@ class DeNovo_GUI(Pmw.Dialog):
             raise ValueError("Please indicate a prior mutation rate strictly between 0 and 1.")
         mut = float(mut)
         
-        return dict(VFch=VFch, VFfa=VFfa, VFmo=VFmo, trioID=ch_fa_mo_flatten, mut=mut, altFreqCol=altFreqCol, defaultFreq=def_freq, 
+        return dict(VFch=VFch, VFfa=VFfa, VFmo=VFmo, boygirl=boygirl, trioID=ch_fa_mo_flatten, mut=mut, altFreqCol=altFreqCol, defaultFreq=def_freq, 
                     threshold=threshold, minALTchild=minALTchild, maxALTparent=maxALTparent)

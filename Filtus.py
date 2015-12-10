@@ -724,6 +724,7 @@ if __name__ == "__main__":
         dn.child.setvalue('1')
         dn.father.setvalue('2')
         dn.mother.setvalue('3')
+        dn.boygirl.setvalue('Boy')
         dn._minALTchild_entry.setvalue('')
         dn._maxALTparent_entry.setvalue('')
         dn._thresh_entry.setvalue('0.00')
