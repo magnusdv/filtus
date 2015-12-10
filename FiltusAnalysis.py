@@ -532,34 +532,68 @@ class VariantSharingComputer(object):
 
 class DeNovoComputer(object):
     def __init__(self):
-        pass
+        self._denovoMode2 = {
+        'A':{
+            (('0','0'),('0','0'),('0','1')):(0,0,1), # 0/0 + 0/0 = 0/1
+            (('0','0'),('0','0'),('1','1')):(0,0,2), # 0/0 + 0/0 = 1/1
+            (('0','0'),('0','1'),('1','1')):(0,1,2), # 0/0 + 0/1 = 1/1
+            (('0','1'),('0','0'),('1','1')):(1,0,2)}, # 0/1 + 0/0 = 1/1
+        'Xboy':{
+            (('0','0'),('0','0'),('1','1')):(0,0,1)}, # 0 + 0/0 = 1
+        'Xgirl':{
+            (('0','0'),('0','0'),('0','1')):(0,0,1), # 0 + 0/0 = 0/1
+            (('0','0'),('0','0'),('1','1')):(0,0,2), # 0 + 0/0 = 1/1
+            (('0','0'),('0','1'),('1','1')):(0,1,2)}} # 0 + 0/1 = 1/1
         
-    def _transm(self, m):
+    
+    def logTransMatrix(self, m, alleleNum, X, boy):
         if not 0 < m < 1: raise ValueError("Prior mutation rate must be between 0 and 1")
-        n = 1-m
-        T = [[[n**2, 2*m*n, m**2], # AA*AA
-        [.5*n, .5, .5*m], # AA*AB
-        [n*m, 1-2*n*m, n*m]], # AA*BB
-        
-        [[.5*n, .5, .5*m], # AB*AA
-        [.25, .5, .25], # AB*AB
-        [.5*m, .5, .5*n]], # AB*BB
-        
-        [[n*m, 1-2*n*m, n*m], # BB*AA
-        [.5*m, .5, .5*n], # BB*AB
-        [m**2, 2*m*n, n**2]]] # BB*BB
+        trioTransmit = self.trioTransmit
+        log10 = math.log10
+        alleles = range(alleleNum)
+        gt = [(j,k) for k in alleles for j in range(k+1)]
+        if X and boy:
+            T = [[[log10(trioTransmit(m, father, mother, ch, X=1, boy=1)) for ch in alleles] for mother in gt] for father in alleles]
+        elif X and not boy:
+            T = [[[log10(trioTransmit(m, father, mother, ch, X=1, boy=0)) for ch in alleles] for mother in gt] for father in gt]
+        else:
+            T = [[[log10(trioTransmit(m, father, mother, ch, X=0)) for ch in gt] for mother in gt] for father in gt]
         return T
     
-    def _REFREFchecker(self, GTonly, includeMissing, GT=None, AD=None, minREFperc=None):
-        _REFREF = ("0/0", "0|0", "./.") if includeMissing else ("0/0", "0|0")
-        if GTonly:
-            def _f(v): return GT(v) in _REFREF
-        else:
-            default = 100 if includeMissing else 0
-            _ADperc = self._ADperc
-            def _f(v): return (GT(v) in _REFREF) or (_ADperc(AD(v), alleleNum=0, default=default) > minREFperc)
-        return _f
     
+        
+    def trioTransmit(self, m, father, mother, child, X, boy=None):
+        '''Compute P(child | par1, par2).
+        
+        m = mutation prior
+        mother = pair of alleles
+        father = pair of alleles or (if X) single allele
+        child = pair of alleles or (if X and boy) single allele
+        X, boy = boolean
+        '''
+        
+        def _singleTransmit(m, parent, child): # P(child_allele | parent)
+            if child in parent: return 1 - m if parent[0] == parent[1] else 0.5
+            else: return m
+        
+        s_mo = _singleTransmit
+        if X and boy:
+            s_fa = lambda m, f, c: 1 # no X transmisison father -> boy
+        elif X and not boy:
+            s_fa = lambda m, f, c: 1-m if f==c else m # single X transmisison father -> girl
+        else:
+            s_fa = _singleTransmit
+        
+        if X and boy: # ad hoc: make diploid to make commands below work.
+            child = [child, child]
+        c1,c2 = child
+        if c1 == c2: # this includes X-boys
+            p = s_fa(m, father, c1) * s_mo(m, mother, c1)
+        else:
+            p = s_fa(m, father, c1) * s_mo(m, mother, c2) + s_fa(m, father, c2) * s_mo(m, mother, c1)
+        return p
+    
+ 
     def _ADperc(self, ADfield, alleleNum, default=0.0):
         '''Input: AD field (string), alleleNum (integer or list of integers). 
         Output: Percentage of reads with the specified allele numbers.'''
@@ -575,108 +609,190 @@ class DeNovoComputer(object):
             print e
             return default
             
-    def _incompatibleAllele(self, v_child, v_fa, v_mo, alleleGetter):
-        '''
-        Example 1: Child=2/2, Father=0/1, mother=1/2 --> 2
-        Example 2: Child=1/2, Father=0/0, mother=0/0 --> [1,2]
-        '''
-        al_ch, al_fa, al_mo = alleleGetter(v_child), alleleGetter(v_fa), alleleGetter(v_mo)
-        if al_ch in [al_fa, al_mo]:
-            return None #if child's genotype equals either parent, then defined to be benign
-        compatible = (al_ch[0] in al_fa and al_ch[1] in al_mo) or (al_ch[0] in al_mo and al_ch[1] in al_fa)
-        if compatible:
-            return None
-        unseen = [x for x in sorted(set(al_ch)) if x not in al_fa and x not in al_mo]
-        if len(unseen) == 1: 
-            return int(unseen[0])
-        elif len(unseen) == 2: 
-            return [int(unseen[0]), int(unseen[1])] # coding as single numeric (assuming < 10 alleles!)
+    
+    def denovoModeMulti(self, al_fa, al_mo, al_ch, X, boy):
+        '''Check if genotype combo is de novo and return mode (PL index triple) and DN allele'''
+
+        def _PLindex(gt, Xmale): # the ordering of PL entries, as described in VCF specs
+            j, k = map(int, gt)
+            return j if Xmale else k*(k+1)/2 + j
         
-        if (al_ch[0] in al_fa and al_ch[1] not in al_mo) or (al_ch[0] in al_mo and al_ch[1] not in al_fa):
-            return int(al_ch[1])
-        return int(al_ch[0])
+        if X and (al_fa[0] != al_fa[1] or (boy and al_ch[0] != al_ch[1])):
+            return False # If any of the males are heterozygous: return as benign.
             
-    def PL2postprob(self, PLch, PLfa, PLmo, TRmatrix, bfrq):    
-        '''Only works for diallelic variants (easy to generalize, but need frequencies for all alleles)'''
-        log10, pow = math.log10, math.pow
-        try:
-            glc, glf, glm = map(self.pl2loglik, (PLch, PLfa, PLmo))  #convert PL's to logliks
-            if len(glc) > 3: raise RuntimeError("Only works for diallelic variants")
-            loga, logb = log10(1-bfrq), log10(bfrq)
-            logHW = (2*loga, log10(2)+loga+logb, 2*logb) #(1-b)^2,2*(1-b)*b, b^2)
-            logliks = [glf[f] + glm[m] + glc[c] + logHW[f] + logHW[m] + log10(TRmatrix[f][m][c]) for f in range(3) for m in range(3) for c in range(3)]
-            postprob = pow(10, logliks[1])/sum(pow(10, ll) for ll in logliks) #logliks[1] corresponds to (0,0,1), i.e. de novo.
-        except Exception as e:
-            postprob = None
+        if X and boy:
+            if al_ch[0] not in al_mo:
+                DNallele = [int(al_ch[0])]
+            else:
+                return False
+        else: # Autosomal - or X girl  
+            compatible = (al_ch[0] in al_fa and al_ch[1] in al_mo) or (al_ch[0] in al_mo and al_ch[1] in al_fa)
+            if compatible:
+                return False
+            unseen = [x for x in set(al_ch) if x not in al_fa + al_mo]
+            if unseen:
+                DNallele = map(int, unseen)
+            elif (al_ch[0] in al_fa and al_ch[1] not in al_mo) or (al_ch[0] in al_mo and al_ch[1] not in al_fa):
+                DNallele = [int(al_ch[1])]
+            else:
+                DNallele = [int(al_ch[0])]
+    
+        # If the de novo allele is REF, return as benign
+        DNallele = [a for a in DNallele if a > 0]
+        if not DNallele:
+            return False
+           
+        mode = [_PLindex(al_fa, Xmale=X), _PLindex(al_mo, Xmale=0), _PLindex(al_ch, Xmale=X and boy)]
+        return mode, DNallele
+                    
+     
+    def priors(self, lenA, bfrq, X, boy):
+        log10 = math.log10
+        if lenA == 2:
+            logfr = [log10(1-bfrq), log10(bfrq)]
+            logHW = (2*logfr[0], log10(2)+logfr[0]+logfr[1], 2*logfr[1]) #(1-b)^2,2*(1-b)*b, b^2)
+        else:
+            logfr = [log10(1-bfrq)] + [log10(bfrq/lenA)]*lenA
+            logHW = [0]*(lenA*(lenA+1)/2)
+            for k in range(lenA):
+                for j in range(k+1):
+                    logHW[k*(k+1)/2 + j] = 2*logfr[k] if k==j else log10(2) + logfr[j] + logfr[k]
+        
+        moPrior = logHW
+        faPrior = logfr if X else logHW
+        return faPrior, moPrior
+        
+    def postDN(self, faPrior, moPrior, logTRmatrix, PLf, PLm, PLc, denovoMode):    
+        pow = math.pow
+        
+        # Genotype ranges: For use in loop below.
+        fL, mL, cL = len(PLf), len(PLm), len(PLc)
+        fR, mR, cR = xrange(fL), xrange(mL), xrange(cL)
+        
+        logliks = [faPrior[f] + moPrior[m] + logTRmatrix[f][m][c] - (PLf[f] + PLm[m] + PLc[c])/10 for f in fR for m in mR for c in cR]
+        
+        # Index of logliks corresponding to the denovo combination
+        f,m,c = denovoMode
+        DNindex = f*mL*cL + m*mL + c
+        
+        postprob = pow(10, logliks[DNindex])/sum(pow(10, ll) for ll in logliks)
         return postprob
         
-    def pl2loglik(self, PL):
-        '''converts PL string to true logliks of AA, AB, BB'''
-        pl10 = [-float(a)/10 for a in PL.split(',')]
-        logRdenom = math.log1p(sum(math.pow(10, x) for x in pl10 if x < 0))/math.log(10)
-        return [y - logRdenom for y in pl10]
+    def fixPL(self, PLf, PLm, PLc, X, boy):
+        if X: 
+            del PLf[1]
+            if boy: del PLc[1]            
         
-    def analyze(self, VFch, VFfa, VFmo, trioID, mut, defaultFreq, altFreqCol=None, MAFcolumns=None, threshold=None, GTonly=None, minALTchild=None, maxALTparent=None, includeMissing=False):
+    def analyze(self, VFch, VFfa, VFmo, trioID, mut, defaultFreq, boygirl, altFreqCol=None, MAFcolumns=None, threshold=None, minALTchild=None, maxALTparent=None):
         #### Checking input data
         if not 0 < defaultFreq < 1: raise ValueError("Default allele frequency must be between 0 and 1")
         if threshold is not None and not 0 <= threshold <= 1: raise ValueError("Posterior probability threshold must be between 0 and 1")
         if minALTchild is not None and not 0 <= minALTchild <= 100: raise ValueError("Minimum child ALT percentage must be between 0 and 100")
         if maxALTparent is not None and not 0 <= maxALTparent <= 100: raise ValueError("Maximum parent ALT percentage must be between 0 and 100")
-        if GTonly is True and (minALTchild is None or maxALTparent is None):
-            raise RunTimeError("When 'GTonly' is False, both parameters 'minALTchild' and 'maxALTparent' must be specified (between 0 and 100).") 
-        if VFch.chromPosRefAlt is None: raise ValueError("The input file format is not VCF-like.") 
-        for col in ['GT', 'AD', 'PL']:
-            for VF in [VFch, VFfa, VFmo]:
-                if not col in VF.columnNames: 
-                    raise ValueError("This analysis requires a '%s' column. This is missing from:\n\n%s" %(col, VF.longName))
         
         #### Setup
-        if GTonly is None: GTonly = (minALTchild is None or maxALTparent is None)
+        vardef = VFch.chromPosRefAlt 
+        if vardef is None: 
+            raise ValueError("The input file format is not VCF-like.") 
         
-        TRmatrix = self._transm(mut)
+        GT, AD, PL = [VFch.columnGetter(x) for x in ('GT', 'AD', 'PL')]
+        if GT is None or PL is None:
+            raise ValueError("Required columns 'GT' and/or 'PL' missing from sample %s" % VFch.longname)
+        
         freq = AlleleFreq(VFch, defaultFreq=defaultFreq, altFreqCol=altFreqCol, MAFcolumns=MAFcolumns, minmax=(0.001, 0.999))
         
-        vardef = VFch.chromPosRefAlt 
-        GT, AD, PL = [VFch.columnGetter(x) for x in ('GT', 'AD', 'PL')]
-        _isREFREF = self._REFREFchecker(GTonly, includeMissing, GT=GT, AD=AD, minREFperc=(100 - maxALTparent if maxALTparent else None))
-        
         item02 = itemgetter(0,2) # used to extract alleles from genotype, e.g. '0/1' -> ('0', '1')
-        def _alleles(v): return sorted(item02(GT(v)))
-        def _multiallelic(v): return ',' in vardef(v)[3]
+        def _alleles(v): 
+            return tuple(sorted(item02(GT(v))))
         
-        pow, log10 = math.pow, math.log10
-        _ADperc, _incompatibleAllele = self._ADperc, self._incompatibleAllele
-        PL2postprob = self.PL2postprob
+        # Local definitions for speed
+        denovoMode2 = self._denovoMode2
+        denovoModeMulti = self.denovoModeMulti
+        ADperc = self._ADperc
+        XminusPAR = FiltusUtils.XminusPAR
         
-        #### Actual computations
-        # Variants where both parents are REF/REF - or variant is multiallelic
-        fa00 = {vardef(v):v for v in VFfa.variants if _isREFREF(v) or _multiallelic(v)}
-        mo00 = {vardef(v):v for v in VFmo.variants if _isREFREF(v) or _multiallelic(v)}
-        both00 = set(fa00) & set(mo00)
+        # Create storage dict for transmisison matrices. Keys: (lenA, X).
+        boy = boygirl.lower()=="boy"
+        logTransmissionProbs = {
+            (2,False): self.logTransMatrix(mut, alleleNum=2, X=False, boy=boy), 
+            (2,True): self.logTransMatrix(mut, alleleNum=2, X=True, boy=boy)}
+        
+        # Parental variant data
+        fa00 = {vardef(v):v for v in VFfa.variants}
+        mo00 = {vardef(v):v for v in VFmo.variants}
+        
+        ##### Main bulk: Loop through all variants in child
         denovo = []
-        
         for v in VFch.variants:
+            
+            ### 1. test: Child = REF/REF --> benign.
+            al_ch = _alleles(v)
+            if al_ch == ('0','0'):
+                continue
+            
             vdef = vardef(v)
-            if vdef not in both00 or _isREFREF(v): continue
-            v_fa, v_mo = fa00[vdef], mo00[vdef]
+            if vdef[0] == 'Y': continue
+            X = XminusPAR(vdef)
+
+            ### 2. test: Missing patrental data --> benign
+            try:
+                v_fa = fa00[vdef]
+                v_mo = mo00[vdef]
+            except KeyError:
+                continue
             
-            if ',' in vdef[3]: #multiallelic!
-                alleleNum = _incompatibleAllele(v, v_fa, v_mo, alleleGetter=_alleles)
-                if not alleleNum: continue
-            else:
-                alleleNum = 1
-            ALTch = _ADperc(AD(v), alleleNum, default=0)
-            if minALTchild and ALTch < minALTchild: continue
-            ALTfa = _ADperc(AD(v_fa), alleleNum, default=0)
-            ALTmo = _ADperc(AD(v_mo), alleleNum, default=0)
-            if maxALTparent and (ALTfa > maxALTparent or ALTmo > maxALTparent): continue
-            
-            post = PL2postprob(PLch=PL(v), PLfa=PL(v_fa), PLmo=PL(v_mo), TRmatrix=TRmatrix, bfrq=freq(v))
-            if post is not None:
+            try:    
+                al_fa, al_mo = _alleles(v_fa), _alleles(v_mo)
+                
+                ### 3. test: Child = either parent --> benign
+                if al_ch in [al_fa, al_mo]:
+                    continue
+        
+                ### 4. test: Check explicitly if genotype combo is de novo
+                multi = ',' in vdef[3]
+                if multi:
+                    multitest = denovoModeMulti(al_fa, al_mo, al_ch, X=X, boy=boy)
+                    if not multitest: 
+                        continue
+                    denovoMode, DNallele = multitest
+                    lenA = vdef[3].count(',') + 2
+                else:
+                    tag = 'A' if not X else 'Xboy' if boy else 'Xgirl'
+                    denovoMode = denovoMode2[tag].get((al_fa, al_mo, al_ch), False)
+                    if not denovoMode:
+                        continue 
+                    DNallele = 1
+                    lenA = 2
+                
+                ### If we've gotten this far, we have a de novo combo, and proceed to compute posterior prob.
+                PLf = [int(a) for a in PL(v_fa).split(',')]
+                PLm = [int(a) for a in PL(v_mo).split(',')]
+                PLc = [int(a) for a in PL(v).split(',')]
+                self.fixPL(PLf, PLm, PLc, X, boy)    
+                
+                ### Log prior probabilitites for parental genotypes
+                faPrior, moPrior = self.priors(lenA, freq(v), X, boy)
+                
+                ### Log transmission probs. NB: Boy is constant, so not necessary in key!
+                TRkey = (lenA, X)
+                if not TRkey in logTransmissionProbs:
+                    logTransmissionProbs[TRkey] = self.logTransMatrix(mut, alleleNum=lenA, X=X,  boy=boy)
+                logTRmatrix = logTransmissionProbs[TRkey]
+                
+                ### Compute posterior prob
+                post = self.postDN(faPrior=faPrior, moPrior=moPrior, logTRmatrix=logTRmatrix, PLf=PLf, PLm=PLm, PLc=PLc, denovoMode=denovoMode)
                 if threshold and post < threshold: continue
                 post_txt = '%.4f'%post
-            else:
+            
+            except Exception as e:
+                print type(e).__name__, '%s: '%e
                 post_txt = '-'
+            
+            ALTch = ADperc(AD(v), DNallele, default=0)
+            if minALTchild and ALTch < minALTchild: continue
+            ALTfa = ADperc(AD(v_fa), DNallele, default=0)
+            ALTmo = ADperc(AD(v_mo), DNallele, default=0)
+            if maxALTparent and (ALTfa > maxALTparent or ALTmo > maxALTparent): continue
             
             denovo.append((post_txt, '%.1f'% ALTch, '%.1f'% ALTfa, '%.1f'% ALTmo) + v)
         
@@ -691,12 +807,6 @@ class DeNovoComputer(object):
         return resultVF
         
    
-    #def PL(liks):
-    #    '''Convert true likelihoods (sum 1) to normalized phred-scaled PL values'''
-    #    x,y,z = [-10*math.log10(y) for y in liks]
-    #    mm = min(x,y,z)
-    #    return (x-mm, y-mm,z-mm)
-
     
 class NgTable(object):
     #TODO: This needs cleaning up. Move GUI stuff out of here.
@@ -1016,14 +1126,12 @@ if __name__ == "__main__":
     reader = VariantFileReader.VariantFileReader()
     
     def test_denovo():
-        test = "example_files\\multiallelic_tests.vcf"; frqCol=""; ch_fa_mo=[0,1,2]
-        vflist = reader.readVCFlike(test, sep="\t", chromCol="CHROM", posCol="POS", geneCol="", splitAsInfo="INFO", keep00=1)
+        test = "example_files\\trio1000.vcf"; frqCol="1000g2014oct_all"; ch_fa_mo=[0,1,2]
+        vflist = reader.readVCFlike(test, sep="\t", chromCol="VCF_CHR", posCol="VCF_POS", geneCol="Gene.refGene", formatCol="VCF_FORMAT",splitAsInfo="", keep00=1)
         VFch, VFfa, VFmo = [vflist[i] for i in ch_fa_mo] 
         dn = DeNovoComputer()
-        res1 = dn.analyze(VFch, VFfa, VFmo, trioID=ch_fa_mo, mut=1e-8, defaultFreq=.1, altFreqCol=frqCol, GTonly=None, minALTchild=30, maxALTparent=10, includeMissing=0)
+        res1 = dn.analyze(VFch, VFfa, VFmo, boygirl="Boy", trioID=ch_fa_mo, mut=1e-8, defaultFreq=.1, altFreqCol=frqCol, minALTchild=None, maxALTparent=None)
         _printVF(res1)
-        res2 = dn.analyze(VFch, VFfa, VFmo, trioID=ch_fa_mo, mut=1e-8, defaultFreq=.1, altFreqCol=frqCol, GTonly=1, minALTchild=30, maxALTparent=10, includeMissing=1)
-        _printVF(res2)
         
     test_denovo()
     

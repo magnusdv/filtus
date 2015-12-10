@@ -668,7 +668,8 @@ if __name__ == "__main__":
     printVF = FiltusAnalysis._printVF
     test_csv = ["..\\..\\Testfiles\\test%d.csv" %i for i in (1,2)]
     test_vcf = "..\\..\\Testfiles\\vcf_example.vcf"
-    triotest = "..\\..\\Testfiles\\triotest.txt" 
+    controltrio = "C:\\testfiles\\trioControl\\hg002_hg003_hg004.hg19_multianno.hgmd.header.txt"
+    #controltrio = "example_files\\trio1000.vcf"
     
     def test_version():
         '''checks that the correct version number is used when saving output files'''
@@ -715,19 +716,26 @@ if __name__ == "__main__":
         dn = FiltusWidgets.DeNovo_GUI(filtus)
         dn2 = FiltusAnalysis.DeNovoComputer()
         
-        filtus.loadFiles([triotest], guess=1, prompt=0, splitAsInfo="", formatCol="vcf_format", keep00=1, geneCol='Gene.refGene')
+        filtus.loadFiles([controltrio], guess=1, prompt=0, splitAsInfo="", formatCol="VCF_FORMAT", keep00=1, geneCol='Gene.refGene')
+        frCol = '1000g2014oct_all'
+        
         dn = FiltusWidgets.DeNovo_GUI(filtus)
         dn._prepare()
-        dn.child.setvalue('ID CH')
-        dn.father.setvalue('ID FA')
-        dn.mother.setvalue('ID MO')
-        dn._altFreqMenu.setvalue('1000g2012apr_all')
+        dn.child.setvalue('1')
+        dn.father.setvalue('2')
+        dn.mother.setvalue('3')
+        dn._minALTchild_entry.setvalue('')
+        dn._maxALTparent_entry.setvalue('')
+        dn._thresh_entry.setvalue('0.00')
+        dn._altFreqMenu.setvalue(frCol)
         dn._def_freq_entry.setvalue('0.1')
         dn.execute("Compute")
-        
         res1 = filtus.text.currentColDat
+        
         ch, fa, mo = filtus.files
-        res2 = dn2.analyze(VFch=ch, VFfa=fa, VFmo=mo, trioID=[0,1,2], mut=1e-8, defaultFreq=0.1, altFreqCol='1000g2012apr_all', minALTchild=30, maxALTparent=10)
+        st = time.time()
+        res2 = dn2.analyze(VFch=ch, VFfa=fa, VFmo=mo, boygirl="Boy", trioID=[0,1,2], mut=1e-8, threshold =0.00, defaultFreq=0.1, altFreqCol=frCol, minALTchild=None, maxALTparent=None)
+        print time.time()-st
         assert res1.length == res2.length
         assert all(a[0]==b[0] for a,b in zip(res1.variants, res2.variants))
         print "ok"
