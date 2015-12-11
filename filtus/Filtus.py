@@ -30,15 +30,29 @@ import FiltusAnalysis
 import FiltusUtils
 import InputDialog
     
+
+try:
+    SCRIPT_DIR = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+except NameError:
+    # For py2exe
+    try:
+        sys.stdout = open("filtus.log", 'w')
+    except Exception:
+        pass
+    
+    if hasattr(sys, 'executable'):
+        SCRIPT_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..'))
+    else:
+        print "Can't get script path"
+
+        
 # module FiltusQC is imported in a try clause - to check availability of numpy and matplotlib.
 try:
     import FiltusQC
     PLOT_error = None
 except ImportError as e:
-    print 'plot import error'
+    print e
     PLOT_error = e
- 
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class FiltusGUI(object):
     def __init__(self, parent):
@@ -660,10 +674,10 @@ def main():
     #root.mainloop() # moved to bottom of file
 
     printVF = FiltusAnalysis._printVF
-    test_csv = ["example_files\\test%d.csv" %i for i in (1,2)]
-    test_vcf = "example_files\\vcf_test.vcf"
+    test_csv = ["testfiles\\test%d.csv" %i for i in (1,2)]
+    test_vcf = "testfiles\\vcf_test.vcf"
     controltrio = "C:\\testfiles\\trioControl\\hg002_hg003_hg004.hg19_multianno.hgmd.header.txt"
-    test_trio = "example_files\\trioHG002_22X.vcf"
+    test_trio = "testfiles\\trioHG002_22X.vcf"
     
     def test_version():
         '''checks that the correct version number is used when saving output files'''
@@ -800,7 +814,7 @@ def main():
         print "Testing advanced load........",
         filtus.clearAll()
         filtus.advLoad = FiltusWidgets.AdvancedLoad(filtus)
-        filtus.advLoad.dirEntry.setvalue("example_files")
+        filtus.advLoad.dirEntry.setvalue("testfiles")
         filtus.advLoad.endswithEntry.setvalue(".vcf")
         filtus.advLoad.endswithVar.set(1)
         filtus.advLoad_prompt()

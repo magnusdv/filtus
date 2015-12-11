@@ -1126,7 +1126,7 @@ if __name__ == "__main__":
     reader = VariantFileReader.VariantFileReader()
     
     def test_denovo():
-        test = "example_files\\trio1000.vcf"; frqCol="1000g2014oct_all"; ch_fa_mo=[0,1,2]
+        test = "testfiles\\trioHG002_22X.vcf"; frqCol="1000g2014oct_all"; ch_fa_mo=[0,1,2]
         vflist = reader.readVCFlike(test, sep="\t", chromCol="VCF_CHR", posCol="VCF_POS", geneCol="Gene.refGene", formatCol="VCF_FORMAT",splitAsInfo="", keep00=1)
         VFch, VFfa, VFmo = [vflist[i] for i in ch_fa_mo] 
         dn = DeNovoComputer()

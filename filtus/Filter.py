@@ -464,7 +464,7 @@ if __name__ == "__main__":
     reader = VariantFileReader.VariantFileReader()
     
     def test_comphetTrio():
-        test = "example_files\\multiallelic_tests.vcf"; ch_fa_mo=[0,1,2]
+        test = "testfiles\\multiallelic_tests.vcf"; ch_fa_mo=[0,1,2]
         vflist = reader.readVCFlike(test, sep="\t", chromCol="CHROM", posCol="POS", geneCol="Gene_INFO", splitAsInfo="INFO", keep00=1)
         VFch, VFfa, VFmo = [vflist[i] for i in ch_fa_mo] 
         res = trioRecessiveFilter(VFch, VFfa, VFmo, "Recessive")

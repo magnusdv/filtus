@@ -1,1 +1,1 @@
-include README.md LICENSE
+include README.md LICENSE filtus/man/* filtus/man/pictures/* filtus/data/* filtus/testfiles/*

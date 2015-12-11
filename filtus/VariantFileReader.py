@@ -196,7 +196,7 @@ class VariantFileReader(object):
 
 if __name__ == "__main__":
     reader = VariantFileReader()
-    testfile = "example_files\\test_file.csv"
+    testfile = "testfiles\\test_file.csv"
     vflist = reader.readVCFlike(testfile, sep=",", chromCol="CHROM", posCol="POS", geneCol="Gene", splitAsInfo="INFO", keep00=1)
     assert vflist[0].length == 425
     vflist = reader.readVCFlike(testfile, sep=",", chromCol="CHROM", posCol="POS", geneCol="Gene", splitAsInfo="INFO", keep00=1, prefilter=("contain", "splic"))

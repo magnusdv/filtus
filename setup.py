@@ -40,7 +40,8 @@ config = {
     },
     'package_data': {
         'filtus': [
-            'man/*/*',
+            'man/pictures/*.png',
+            'man/*.html',
             'data/*',
             'testfiles/*'
         ]
