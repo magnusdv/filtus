@@ -658,13 +658,12 @@ class BusyManager(object):
         self.widgets = {}
         self.isBusy = False
 
-root = Pmw.initialise()
-filtus = FiltusGUI(root)
-#root.mainloop() # moved to bottom of file
 
+def main():
+    root = Pmw.initialise()
+    filtus = FiltusGUI(root)
+    #root.mainloop() # moved to bottom of file
 
-if __name__ == "__main__":
-    
     printVF = FiltusAnalysis._printVF
     test_csv = ["example_files\\test%d.csv" %i for i in (1,2)]
     test_vcf = "example_files\\vcf_test.vcf"
@@ -838,12 +837,16 @@ if __name__ == "__main__":
             print 'all tests passed'
         else:
             locals()[sys.argv[1]]()
+         
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        root.destroy()
+    except Exception as e:
+        print e
+        root.destroy()
+       
+if __name__ == "__main__":
+    main()
     
-try:
-    root.mainloop()
-except KeyboardInterrupt:
-    root.destroy()
-except Exception as e:
-    print e
-    root.destroy()
     
