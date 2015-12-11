@@ -38,6 +38,7 @@ except ImportError as e:
     print 'plot import error'
     PLOT_error = e
  
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class FiltusGUI(object):
     def __init__(self, parent):
@@ -45,14 +46,8 @@ class FiltusGUI(object):
         self.version = VERSION
         parent.title("FILTUS " + self.version)
         
-        if os.path.isdir("man"):
-            self.manualdir = os.path.abspath("man")
-            self.datadir = os.path.abspath("data")
-        elif os.path.isdir("../man"):
-            self.manualdir = os.path.abspath("../man")
-            self.datadir = os.path.abspath("../data") 
-        else:
-            self.manualdir, self.datadir = None, None
+        self.manualdir = os.path.join(SCRIPT_DIR, "man")
+        self.datadir = os.path.join(SCRIPT_DIR, "data")
         
         self.busyManager = BusyManager(parent)
         self.windowingsystem = parent.tk.call('tk', 'windowingsystem')

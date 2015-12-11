@@ -14,7 +14,7 @@ config = {
     'author_email': 'magnusdv@medisin.uio.no',
     'license': 'GPL-2',
     'url': 'https://github.com/magnusdv/filtus',
-    'download_url': 'https://github.com/magnusdv/filtus/tarball/v1.0.0',
+    #'download_url': 'https://github.com/magnusdv/filtus/tarball/v1.0.0',
     'install_requires': [
         'matplotlib',
         'pmw'
@@ -40,9 +40,9 @@ config = {
     },
     'package_data': {
         'filtus': [
-            'man',
-            'data',
-            'testfiles'
+            'man/*/*',
+            'data/*',
+            'testfiles/*'
         ]
     }
 }
