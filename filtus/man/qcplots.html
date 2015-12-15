@@ -7,7 +7,7 @@ qc plots
 </head>
 <body>
 <h1 style="color: black;">
-QC plots
+Quality control plots
 </h1>
 
 <a href="#description">Description</a>&nbsp;&nbsp;
@@ -38,7 +38,7 @@ Select the samples you want to include. Note: For scatter plots and histograms t
 <dt><strong>
 Comparative plots
 </strong></dt><dd>
-Each of these produce a single scatter plot, where each dot represents a sample. With 12 or fewer selected samples, they get different symbols, and a legend is included in the plot.
+Each of these produces a single scatter plot, where each dot represents a sample. With 12 or fewer selected samples, they get different symbols, and a legend is included in the plot.
 If <em>Write to text</em> is checked, the coordinates of all plotted points will be written to the specified file.<br><br>
 <ul><li>
 <strong>Gender.</strong> This is a simple gender estimator. For each sample the program computes the percentage of 
@@ -50,7 +50,7 @@ The plot region is divided into male/female/uncertain regions to help interpreta
 <li>
 <strong>Private variants.</strong> This plot shows the number of private variant positions for each sample (i.e. non-REF/REF variants not observed in any other of the selected samples), 
 plotted against the total number of variants. For speed and simplicity, heterozygous and homozygous variants are counted equally. Outliers in this plot, e.g. a sample with many more private variants than the others,
-could be a sign of sequencing/bioinformatic errors, or it could be an individual from a very different population that the others. 
+could be a sign of sequencing/bioinformatic errors, or it could be an individual from a genetically different population that the others. 
 Oppositely, individuals with few private variants suggest relatedness between the selected samples.
 </li><br><li>
 <strong>Heterozygosity.</strong> Here the autosomal heterozygosity ratio is plotted against the total number of autosomal variant positions for each sample. 
@@ -60,15 +60,15 @@ Some deviation could be caused by inbreeding (reduces heterozygosity), or large 
 </ul>
 <br>
 <dt><strong>Scatter plots</strong></dt><dd>
-Produces a grid of scatter plots (one for each selected sample) of the two columns. Only works for numerical entries. 
-(If there are non-numerical entries in a column you want to plot, add an appropriate column filter before opening the plot dialog.)
+This functionality produces a grid of scatter plots (one for each selected sample) of two chosen numerical columns.
+(If there are non-numerical entries in a column you want to plot, you should apply an appropriate column filter before opening the plot dialog.)
 Each point represents a single variant, color coded according to genotype. 
 If the parameter <em>Thin by</em> is an integer k > 1, then only every k'th variant is plotted. 
 Finally, the transparency of the plot symbols can be controlled by the <em>Transp.</em> parameter (0=fully transparent, 1=no transparency).
 </dd><br>
 
 <dt><strong>Histogram plots</strong></dt><dd>
-Produces histograms - one for each selected sample - of a numerical column.
+This functionality produces a grid of histogram plots (one for each selected sample) of a numerical column.
 </dd>
 
 </dl>

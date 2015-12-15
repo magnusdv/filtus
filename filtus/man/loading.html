@@ -96,7 +96,7 @@ recognized.</p>
 Basic settings
 </strong></dt><dd>
 Choose the correct column separator and preamble indicator (if your file has initial meta information). 
-Filtus will treat the first line *not* starting with this indicator, as the header line.
+Filtus will treat the first line *not* starting with this indicator, as the header line, and all remaining lines as variant lines. For VCF files the preamble indicator is ##.
 </dd><br>
 
 <dt><strong>
@@ -111,7 +111,7 @@ Column splits
 For VCF-like files, the default is to split the genotype columns according to the <em>FORMAT</em> column. This can be overruled by unchecking the <em>Split FORMAT/genotypes</em>.<br><br>
 Splitting the INFO column is not done by default, but will be performed if you indicate the correct column in <em>Split as "INFO"</em>. This action will result in the <em>INFO</em> column being replaced by
 new columns according to the tags detected in the original column. The new column names are postfixed by "_INFO".<br><br>
-Additional, simple column splits can also be performed. A typical example would be to split the <em>AD</em> field on ',', which would result in new columns <em>AD1</em>, <em>AD2</em>, ....  
+Additional, simple column splits can also be performed. A typical example would be to split the <em>AD</em> field on ',' (comma), which would result in new columns <em>AD1</em>, <em>AD2</em>, ....  
 </dd><br>
 
 <dt><strong>
@@ -125,7 +125,7 @@ entry with the keyword "REGEX".<br><br>
 <dt><strong>
 Use for all files
 </strong></dt><dd>
-When loading many files, clicking this button signals that the same settings should sliently be applied to all files.
+When loading many files, clicking this button signals that the same settings should silently be applied to all files.
 </dd><br>
 
 <dt><strong>

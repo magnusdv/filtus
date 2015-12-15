@@ -15,13 +15,13 @@ Gene sharing: Unrelated samples
 <a href="#algorithm">Algorithm</a>
 
 <h2 id="description" style="color: black;">Description</h2><p>
-Identification of genes where all the affected have variants compatible with the disease model. Unafected samples are used as an additional filter.
+Identification and statistical evaluation of genes where all the affected have variants compatible with the disease model. Unaffected samples are used as an additional filter.
 </p>
 
 <h2 id="prerequisites" style="color: black;">Prerequisites</h2><p>
 The analysis can be applied to any variant files loadable in Filtus, as long as the genotype format is correctly given in the input settings. 
 In particular, samples from different variant files can be analyzed together, even if the files have different formats.<br><br>
-For Recessive analysis, all involved samples must have a well defined gene column (specified in the input settings). 
+For recessive analyses, all involved samples must have a well defined gene column (specified in the <a href="loading.html#inputsettings">input settings</a>). 
 
 <h2 id="dialog" style="color: black;">Dialog</h2>
 <div style="text-align: center;"><img alt="Gene sharing dialog" height="180" src="pictures/genesharing.png"><br></div>
@@ -29,13 +29,13 @@ For Recessive analysis, all involved samples must have a well defined gene colum
 <dt><strong>
 Model
 </strong></dt><dd>
-The genetic disease model, either <em>Dominant</em>, <em>Recessive</em> (which includes both compound heterozygous and homozygous models) and <em>Recessive homoz</em> (homozygous only).
+The genetic disease model, either <em>Dominant</em>, <em>Recessive c/h</em> (which includes both compound heterozygous and homozygous models) or <em>Recessive homoz</em> (homozygous only).
 </dd><br>
 
 <dt><strong>
 Affected
 </strong></dt><dd>
-Indicate the affected samples, separated by comma. Samples can be specified in various ways:
+The affected samples, separated by comma. Samples can be specified in various ways:
 <ul><li>Sample numbers, corresponding to the order in the <em>Loaded samples</em> window. Example: <kbd>2,3,4,10,11,15</kbd>.</li>
 <li>Number ranges. For instance the previous example could be written <kbd>2-4, 10-11, 15</kbd>.</li>
 <li>Text identifiers. You can write <kbd>ID &lt;s1&gt;, ...</kbd> where <kbd>&lt;s1&gt;, ...</kbd> are uniquely identifying parts of the wanted sample names. 
@@ -50,7 +50,7 @@ For example, <kbd>NOT 1-10</kbd> selects all samples except the first 10, while 
 <dt><strong>
 Healthy
 </strong></dt><dd>
-Indicate the unaffected/control samples. Syntactic choices are as for the <strong>Affected</strong> field.
+The unaffected/control samples. Notational options are as for the <strong>Affected</strong> field.
 </dd>
 
 </dl>
@@ -65,7 +65,8 @@ Right click on a gene to view the relevant variants in that gene. You can also v
 
 
 <h2 id="algorithm" style="color: black;">The algorithm</h2><p>
-todo
+The p-values are computed according to the statistical model described in 
+<a href="http://www.ncbi.nlm.nih.gov/pubmed/22348076">Statistical guidance for experimental design and data analysis of mutation 
+detection in rare monogenic mendelian diseases by exome sequencing</a> by Zhi and Chen (2012).
 </p>
-
 </body></html>

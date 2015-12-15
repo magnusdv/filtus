@@ -21,27 +21,28 @@ Identification of autozygous regions in an individual with consanguineous parent
 </p>
 
 <h2 id="prerequisites" style="color: black;">Prerequisites</h2><p>
-The AutEx algorithm can be applied to any variant file loadable in Filtus, as long as the genotype format is correctly given in the input settings. 
+The AutEx algorithm can be applied to any variant file loadable in FILTUS, as long as the genotype format is correctly given in the input settings. 
 However, the following points should be kept in mind to maximize the power of AutEx:
 <ul>
-<li>The more variants, the better! A typical single-sample file with 15-20 000 exonic variants is ok, but will leave some parts of the genome poorly covered. 
+<li>The more variants, the better. A typical single-sample file with 15-20 000 exonic variants is ok, but will leave some parts of the genome poorly covered. 
 If available, use files where intronic/intergenic variants are included.</li>
-<li>If the variant file has VCF-like genotype format, and contains 0/0 genotypes, remember to check the <em>keep 0/0</em> box. 
-The 0/0 genotypes are just as informative for autozygosity mapping, as the 1/1 variants!</li>
+<li>If the variant file has VCF-like genotype format, and contains 0/0 genotypes, remember to check the <em>keep 0/0</em> box in the <a href="loading.html#inputsettings">input settings dialog</a>. 
+(The 0/0 genotypes are just as informative for autozygosity mapping, as the 1/1 variants!)</li>
 <li>Correct allele frequencies are important for this algorithm to perform optimally. Without a frequency column in your variant file, 
-you can still run AutEx (specifying a default frequency value) but the output will be less accurate. </li>
+you can still run AutEx (specifying a default frequency value), but the output will be less accurate. </li>
 </ul>
 
 <h2 id="dialog" style="color: black;">Dialog</h2>
 <div style="text-align: center;"><img alt="Autex dialog" height="350" src="pictures/autex.png"><br></div>
 
-<p>To open the AutEx dialog, first select a single sample in the <em>Loaded samples</em> window (at the top left of the main view of Filtus) and then choose <em>AutEx: Regions of autozygosity</em> in the <em>Analysis</em> menu. Any
+<p>To open the AutEx dialog, first select a single sample in the <em>Loaded samples</em> window (at the top left of the main view of FILTUS) 
+and then choose <em>AutEx: Regions of autozygosity</em> in the <em>Analysis</em> menu. Any
 filters (e.g. PASS) should be applied before opening the dialog.</p>
 
 <dl>
 <dt><strong>Model parameters</strong></dt><dd>
 Use the <em>parental relation</em> parameter to indicate the degree of inbreeding of the sample under analysis. 
-The algorithm uses this as prior information on the number and length of autozygous regions it can expect.<br><br>
+The algorithm uses this as prior information on the expected number and length of autozygous regions.<br><br>
 In our experience, the results are not sensitive to this choice, in particular when the number of variants is large. This is not surprising: 
 Any true autozygous segment covered by the sequencing is likely to contain many variants. The collective evidence of these variants quickly drowns the impact of the prior.
 </dd><br>
@@ -55,11 +56,11 @@ the <span style="font-style: italic;">Missing entry value</span>
 will be used for all variants.</dd><br>
 
 <dt><strong>Output</strong></dt><dd>
-TODO</dd><br>
+These parameters impose filters on the reported regions. If a <em>Posterior threshold</em> is given, only regions where the posterior probability exceeds this are included.
+One can also put lower limits on the region length and/or the number of variants in each region.</dd><br>
 
 <dt><strong>Summary</strong></dt><dd>
-A summary of the findings is printed here. The identified autozygous regions are shown in the main Filtus window; to inspect them you must close the AutEx dialog.<br><br>
-TODO: Explain inbreeding coefficient estimate
+A summary of the findings is printed here. The identified autozygous regions are shown in the main FILTUS window; to inspect them you must close the AutEx dialog.<br><br>
 </dd>
 
 <dt><strong>Plot</strong></dt><dd>
@@ -71,10 +72,18 @@ This functionality plots a single chromosome, showing all the variants, the post
 <p><em>Tip 2:</em> The algorithm only works on the autosomes. You don't have to filter out X and Y yourself, this is taken care of internally.
 <p><em>Tip 3:</em> To save the regions to a file, first close the AutEx dialog and then select <em>Save main window content</em> in the <em>File</em> menu.</p>
 <p><em>Tip 4:</em> After saving the regions to a file (previous tip) this file can be directly used as a Region filter. 
-This two-step approach is the common way to perform homozygosity/autozygosity mapping in Filtus.</p>
+This two-step approach is the common way to perform homozygosity/autozygosity mapping in FILTUS.</p>
 
 <h2 id="algorithm" style="color: black;">Algorithm</h2><p>
-todo
+The AutEx algorithm implemented in FILTUS is designed for detecting autozygous regions directly from HTS variant files. 
+It is based on the hidden Markov model introduced by Leutenegger et al. in 
+<a href="http://www.ncbi.nlm.nih.gov/pubmed/12900793">Estimation of the inbreeding coefficient through use of genomic data</a> which we refer to for mathematical details. 
+In brief, the IBD process along an inbred chromosome is approximated as a Markov model with two states, IBD and not-IBD, 
+with transition probabilities depending on the genetic map distances and also the relationship between the parents. 
+The observed variables are the variant genotype calls, whose emission probabilities depend on allele frequencies and genotyping error rates. 
+A standard forward-backward algorithm is applied to compute the posterior IBD probability at each variant locus. 
+Regions where these probabilities exceed a given threshold are reported as autozygous.
+The implementation uses the Decode recombination map (Kong et al., 2010) to compute genetic distances. 
 </p>
 
 </body></html>

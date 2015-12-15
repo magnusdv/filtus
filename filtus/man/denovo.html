@@ -10,7 +10,6 @@ de novo
 Detection of <em>de novo</em> variants
 </h1>
 
-
 <a href="#description">Description</a>&nbsp;&nbsp;
 <a href="#prerequisites">Prerequisites</a>&nbsp;&nbsp;
 <a href="#dialog">Dialog</a>&nbsp;&nbsp;
@@ -37,9 +36,9 @@ checked in the <a href="loading.html#inputsettings">input
 settings dialog</a>.</li>
 </ul>
 
-<p><em>NOTE: If your variant files don't meet the above requirements, there may still be hope! In many cases you can identify potential <em>de novo</em> variants using the 
-<a href="familybased.html#inputsettings">family based filter</a> with a dominant model (follow the link to see details). For instance, if all you have are individual variant files for a child and both parents, 
-this would be the thing to do. The downside is that you wouldn't get posterior probabilities - or any other meassure of classification strength - and probably quite a few more false positives.
+<p><em>NOTE: If your variant files don't meet the above requirements, there may still be hope! In many cases you can identify potential <em>de novo</em> variants using a 
+family based gene sharing with a dominant model. For instance, if all you have are individual variant files for a child and both parents, 
+this would be the thing to do. The downside is that you wouldn't get posterior probabilities - or any other measure of classification strength - and probably quite a few more false positives.
 </em></p>
 
 <h2 id="dialog" style="color: black;">Dialog</h2>
@@ -57,13 +56,13 @@ Trio samples
 </strong></dt><dd>
 Indicate the sample numbers (corresponding to the sample
 order in the <span style="font-style: italic;">Loaded
-samples</span> window in the main Filtus area.) Alternatively,
+samples</span> window in the main FILTUS area.) Alternatively,
 you can use the syntax <kbd>ID &lt;string&gt;</kbd> where
 <kbd>&lt;string&gt;</kbd> is a unique identifier for the sample name (as
 given in the variant file). For example, if the sample name of the
 child is "Trio1_child" you can write <kbd>ID child</kbd>. If the string is not
 unique (i.e. if there are multiple loaded sample names containing
-"child"), you will be warned.
+"child") you will be warned.
 </dd><br>
 <dt><strong>
 Mutation rate
@@ -84,9 +83,9 @@ contain a number. If your variant file does not have frequency data,
 the <span style="font-style: italic;">Missing entry value</span>
 will be used for all variants. Without correct frequencies, the program
 will still identify the same potential <em>de novo</em> variants,
-but the posterior probabilies may be less accurate.<br><br>
+but the posterior probabilities may be less accurate.<br><br>
 NB: For multiallelic variants, the frequency column is ignored. As a
-result, any multiallelic variants detected by the de novo algorithm
+result, any multiallelic variants detected by the <em>de novo</em> algorithm
 gets a missing posterior probability ('-'). Since the output is sorted
 on the posterior probability, these will end up at the bottom of the
 list.
@@ -96,34 +95,64 @@ list.
 Output filters
 </strong></dt><dd>
 The purpose of these filters is to reduce the
-number of false positives in the output. A true heterozygous de novo
+number of false positives in the output. A true heterozygous <em>de novo</em>
 variant is expected to present with ALT/REF ratio close to 50% in the
 child, and 0% in the parents. In practice some slack is recommended,
 e.g. child &gt; 30% and parents &lt; 5%.<br><br>
 One may experiment
 with these filters for other purposes too: For example, to look for de
-novo mosiac variants in the child one could try a very loose cutoff for
+novo mosaic variants in the child one could try a very loose cutoff for
 the child, e.g. child &gt; 10%, while requiring parents = 0%. Or
 oppositely, for variants inherited from a mosaic parent, something like
 parents &lt; 25% and child &gt; 40% would be sensible, without
-including too much garbage. Of course, these are merely
+resulting in too many false positives. Of course, these are merely
 suggestions whose validity depend heavily on the actual
-contents of the variant file. (E.g. the quality of the
-variants and the parameters of the variant calling.) </dd><br>
+contents of the variant file (e.g. the quality of the
+variants and the parameters of the variant calling). </dd><br>
 
 <dt><strong>
 Summary
 </strong></dt><dd>
-A summary of the findings is printed here. The identified variants are shown in the main Filtus window; to inspect them you must close the de novo dialog. 
+A summary of the findings is printed here. The identified variants are shown in the main FILTUS window; to inspect them you must close the <em>de novo</em> dialog. 
 </dd></dl>
 
 <h2 id="tips" style="color: black;">Practical tips</h2>
 <p><em>Tip 1:</em> 
-To save the results, first close the de novo dialog, and then select Save main window content in the File menu.</p>
+To save the results, first close the <em>de novo</em> dialog, and then select Save main window content in the File menu.</p>
 <p><em>Tip 2:</em> 
-When browsing variants in the main Filtus window, you can right click on any particular variant to see details about that variant for all the samples.</p>
+When browsing variants in the main FILTUS window, you can right click on any particular variant to see details about that variant for all the samples.</p>
 
 <h2 id="algorithm" style="color: black;">Algorithm</h2><p>
-TODO
-
+FILTUS uses the GT field of the genotype columns to recognize the following <em>de novo</em> genotype patterns (father + mother = child):
+<ul>
+<li>Autosomal:
+    <ul>
+    <li>0/0 + 0/0 = 0/1</li>
+    <li>0/0 + 0/0 = 1/1</li>
+    <li>0/0 + 0/1 = 1/1</li>
+    <li>0/1 + 0/0 = 1/1</li>
+    </ul></li>
+<li>X-linked, child is boy:
+    <ul>
+    <li>0 + 0/0 = 1</li>
+    </ul></li>
+<li>X-linked, child is girl:
+    <ul>
+    <li>0 + 0/0 = 0/1</li>
+    <li>0 + 0/0 = 1/1</li>
+    <li>0 + 0/1 = 1/1</li>
+    </ul></li>
+</ul>
+A variant is treated as X-linked in this context only if it is located outside of the pseudoautosomal regions PAR1 and PAR2 on the X chromosome. 
+Multiallelic generalizations of the above patterns are also caught. 
+However, combinations with any of the following properties are treated as benign and discarded from further analyses:
+<ul>
+<li>The <em>de novo</em> allele is 0 (= REF). Example: 1/1 + 1/1 = 0/1.</li>
+<li>Child genotype equals either of the parents. Example: 0/0 + 1/1 = 1/1.</li>
+<li>Missing genotype in any trio member.</li>
+<li>A male trio member is reported as heterozygous for an X-linked variant.</li>
+</ul>
+For each variant where a <em>de novo</em> genotype combination is identified, FILTUS reports the posterior <em>de novo</em> probability. This is computed using a Bayesian formula involving the 
+population allele frequencies, the genotype likelihoods reported by the variant caller (in the PL fields) and the prior mutation rate specified by the user.
+</p>
 </body></html>
