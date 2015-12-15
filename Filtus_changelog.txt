@@ -2,6 +2,24 @@
     FILTUS Changelog
 =========================
 
+Version 1.0.1. Date 15.12.2015
+--------------------------------
+
+OTHER:
+* Bug fixes and clean-ups.
+
+
+Version 1.0.0. Date 11.12.2015
+--------------------------------
+
+NEW FEATURES:
+* Help pages for many features are now available by clicking on question marks within FILTUS.
+* De novo dialog: Added a gender selector for the child, which is important for correct handling of X-linked variants.
+
+OTHER:
+* Lots of minor changes in preparation for publication.
+
+
 Version 0.99-95. Date 29.10.2015
 --------------------------------
 
@@ -16,7 +34,7 @@ Version 0.99-94. Date 07.09.2015
 
 NEW FEATURES:
 * A new feature "Prefilter" replaces the old "Startup filter" in the Input settings dialog. If a prefilter is given, it is applied to each line before processing it (splitting columns a.s.o), making it fast and memory efficient. (In contrast, the old "Startup filter" processed the whole file before applying the filters.)
-By using prefilters you can work with files of virtually any size in Filtus, as long as the prefilter reduces it to a manageable number of variants. Example: Suppose you have a whole-genome variant file, with some annotation indicating the functional type of each variant. A useful prefilter in this case could be: "Keep lines which contain 'exonic OR splice'"
+By using prefilters you can work with files of virtually any size in FILTUS, as long as the prefilter reduces it to a manageable number of variants. Example: Suppose you have a whole-genome variant file, with some annotation indicating the functional type of each variant. A useful prefilter in this case could be: "Keep lines which contain 'exonic OR splice'"
 
 * The de novo detection feature is moved to the Analysis menu, and has more options (including filtering on ALT ratios).
 
@@ -146,7 +164,7 @@ BUG FIXES:
 Version 0.99-2. Date 01.11.2013
 ------------------------------
 NEW FEATURES:
-* QC plots: The main new feature in this version is a plotting functionality. This imports matplotlib and numpy, making the windows version of Filtus quite a bit larger. (Note: For Mac and Linux, these libraries must be installed on the system for the plotting to work.) Several types of QC-motivated and exploratory plots are offered. To get a quick overview of a batch of exome sequences it is useful to plot heterozygosity levels, private variants and gender estimation. These can also be compared with an inhouse database of other similar samples. In addition the user can produce histograms or scatter plots of numerical columns in the files. 
+* QC plots: The main new feature in this version is a plotting functionality. This imports matplotlib and numpy, making the windows version of FILTUS quite a bit larger. (Note: For Mac and Linux, these libraries must be installed on the system for the plotting to work.) Several types of QC-motivated and exploratory plots are offered. To get a quick overview of a batch of exome sequences it is useful to plot heterozygosity levels, private variants and gender estimation. These can also be compared with an inhouse database of other similar samples. In addition the user can produce histograms or scatter plots of numerical columns in the files. 
 
 
 Version 0.99-1. Date 09.10.2013

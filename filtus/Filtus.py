@@ -5,7 +5,7 @@
 #----------------------------------------------------------------
 
 PROGRAM_NAME = "FILTUS"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 import gc
 import sys
@@ -14,7 +14,7 @@ import os.path
 from math import copysign
  
 if sys.version_info[:2] != (2,7):
-    print "Python 2.7 is needed to run Filtus. Your Python version is %d.%d.%d" %sys.version_info[:3]
+    print "Python 2.7 is needed to run FILTUS. Your Python version is %d.%d.%d" %sys.version_info[:3]
     sys.exit(0)
 
 import time
@@ -485,7 +485,7 @@ class FiltusGUI(object):
         olddef, oldtext = self.defaultfont['size'], self.textfont['size']
         defaultsize, textsize = abs(defaultsize), abs(textsize)
         if init: # True during initializing of filtus
-            defaultsize -= 1; textsize -= 1
+            defaultsize += 1; textsize += 1
         cpsgn = copysign
         if init or (defaultsize != abs(olddef)):
             self.defaultfont['size'] = int(cpsgn(defaultsize, olddef))
@@ -612,7 +612,7 @@ class FiltusGUI(object):
                 command=self._showSummary(summarizer, col))
         
         nUnique = len(uniqueCols)
-        nCols = -(-nUnique/28) # What the hell... hvorfor? heltallsdivisjon?
+        nCols = -(-nUnique/28) # hvorfor? heltallsdivisjon?
         N = -(-nUnique/nCols)
         for i in range(1, nCols):
             summarymenu.entryconfigure(i * N, columnbreak=1)

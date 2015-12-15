@@ -586,7 +586,7 @@ class GeneView(Pmw.Dialog):
             self.deactivate()
 
     def _set(self, VF, meta=''):
-        title = self._geneTitle(origVF.genes)
+        title = self._geneTitle(VF.genes)
         self.text.prettyPrint(VF, rightClick="variantMenu", label=title)
         
     def display(self, VF):#, meta=''):
@@ -606,7 +606,7 @@ class GeneView(Pmw.Dialog):
             genetitle = ', '.join(genes)
         else: 
             genetitle = "%d selected genes"%len(genes)
-        return genetilte
+        return genetitle
         
         
 class VariantView(Pmw.Dialog):
