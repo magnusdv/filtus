@@ -3,19 +3,22 @@
 <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>filtus</title></head>
 <body>
 <h1 style="color: black;">FILTUS</h1>
-<big>Filtus is a stand-alone tool for downstream
+<big>FILTUS is a stand-alone tool for downstream
 analysis in high-throughput sequencing projects. It is especially well
-suited for Mendelian disease mapping, offering statistical evaluation
-of variant sharing across related or unrelated individuals. The program is written in Python, by:<br><br>Magnus Dehli Vigeland, PhD<br>Department of Medical Genetics, Oslo University Hospital, Norway<br></big><big>Email: magnusdv&lt;at&gt;medisin&lt;dot&gt;uio&lt;dot&gt;no</big><br><big>
-<br>Filtus accepts (at least in principle) any format of variant files, as
+suited for identification of variants causing Mendelian disease. The program is written in Python, by:
+<br><br>Magnus Dehli Vigeland, PhD<br>
+Department of Medical Genetics<br>
+Oslo University Hospital, Norway<br>
+Email: magnusdv&lt;at&gt;medisin&lt;dot&gt;uio&lt;dot&gt;no</big><br><big>
+<br>FILTUS accepts (at least in principle) any format of variant files, as
 long as you state which columns contain the essential
 information (e.g. chromosome, position, gene and genotype). Standard
-VCF files are automatically recognized. Unlike other variant tools, Filtus is completely self-contained and
+VCF files are automatically recognized. Unlike other variant tools, FILTUS is completely self-contained and
 does not require an internet connection. This may be an important point
 if you are not allowed to be online when working with human
 sequence data.<br>
 </big><span style="font-weight: bold;"><br>
-</span><big>The latest version of Filtus is 1.0.1. Take a
+</span><big>The latest version of FILTUS is 1.0.1. Take a
 look at the <a href="FILTUS/Filtus_changelog.txt" target="_top">changelog</a>
 to see recent developments.</big><big> Questions,
 bug reports, feature requests and other comments are welcome by email
@@ -60,23 +63,23 @@ features.</li>
 <ul>
 <li>Download the latest version <a href="FILTUS/Filtus1.0.1.zip">here</a>
 and unpack the zip-file in any location you prefer. To start the
-program, simply double-click on the file Filtus.exe in the
-unpacked folder.</li>
+program, simply double-click on the file FiltusXXX.exe in the
+unpacked folder (XXX = version number).</li>
 </ul>
 A couple of things to notice:<br>
 <ol>
-<li>The windows version of Filtus requires a 64-bit processor.</li>
+<li>The windows version of FILTUS requires a 64-bit processor.</li>
 <li>The unpacked Filtus folder contains a great number of
 files in addition to the .exe file. These are for internal use only and
 should be ignored (but not deleted) by end users.</li>
-<li>To create a Filtus icon on the desktop (Windows 7):</li>
+<li>To create a FILTUS icon on the desktop (Windows 7):</li>
 <ol>
 <li>Right click on the .exe file</li>
 <li>Choose <em>Send to</em> and then <em>Desktop
 (create shortcut)</em></li>
 </ol>
-<li>To uninstall Filtus you can just delete the Filtus folder.
-Filtus leaves no footprint on your computer.</li>
+<li>To uninstall FILTUS you can just delete the Filtus folder.
+FILTUS leaves no footprint on your computer.</li>
 </ol>
 <br>
 <h3>MAC/LINUX</h3>
@@ -105,18 +108,18 @@ must be installed on your system.</li>
 <br>
 <hr style="width: 100%; height: 2px;">
 <h2>Loading a test file</h2>
-To check that everything is OK, you can load the test file included in the "example_files" folder:<br>
+To check that everything is OK, you can load a test file as follows:<br>
 <ul>
-<li>Start Filtus.</li>
+<li>Start FILTUS.</li>
 <li>On the <em>File</em> menu,
 choose <em>Load files (simple).</em></li>
-<li>Move to the <em>example_files</em>
+<li>Move to the <em>testfiles</em>
 folder, choose <em>test_file.csv</em> and
 press <em>Open.</em></li>
 <li>In the Input file settings dialog, click <em>Use
 for all files.</em></li>
 <li>You should now see the file name in the <em>Loaded
-files</em> window, and a row in the <em>Unfiltered
+samples</em> window, and a row in the <em>Unfiltered
 summaries</em> window saying "425 variants in 205 genes". If you
 double-click on this row, you should see the contents of the file in
 the main window.</li>

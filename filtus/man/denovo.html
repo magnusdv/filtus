@@ -14,10 +14,12 @@ Detection of <em>de novo</em> variants
 <a href="#prerequisites">Prerequisites</a>&nbsp;&nbsp;
 <a href="#dialog">Dialog</a>&nbsp;&nbsp;
 <a href="#tips">Practical tips</a>&nbsp;&nbsp;
+<a href="#example">Example</a>&nbsp;&nbsp;
 <a href="#algorithm">Algorithm</a>
 
 <h2 id="description" style="color: black;">Description</h2><p>
-Identification of <em>de novo</em> variants in a trio (child + both parents). Posterior de novo probabilities are computed using a Baysian approach.
+Identification of <em>de novo</em> variants in a trio (child + both parents). The output includes posterior <em>de novo</em> probabilities 
+as well as the percentage of reads with the alternative allele.
 </p>
 
 <h2 id="prerequisites" style="color: black;">Prerequisites</h2><p>
@@ -62,7 +64,9 @@ you can use the syntax <kbd>ID &lt;string&gt;</kbd> where
 given in the variant file). For example, if the sample name of the
 child is "Trio1_child" you can write <kbd>ID child</kbd>. If the string is not
 unique (i.e. if there are multiple loaded sample names containing
-"child") you will be warned.
+"child") you will be warned. If you don't know who's who in the trio, 
+you can find out using the <a href="qcplots.html#tips">Quality Control Plots</a> (see Tip 3 on that page).<br><br>
+Finally, you should also indicate the gender of the child, to ensure correct handling of X-linked variants.
 </dd><br>
 <dt><strong>
 Mutation rate
@@ -79,29 +83,23 @@ Allele frequencies
 Indicate a column containing frequencies for
 the ALT alleles. The <span style="font-style: italic;">Missing
 entry value</span> is substituted whenever the column does not
-contain a number. If your variant file does not have frequency data,
+contain a number, or if the variant is multiallelic. If your variant file does not have frequency data,
 the <span style="font-style: italic;">Missing entry value</span>
 will be used for all variants. Without correct frequencies, the program
 will still identify the same potential <em>de novo</em> variants,
-but the posterior probabilities may be less accurate.<br><br>
-NB: For multiallelic variants, the frequency column is ignored. As a
-result, any multiallelic variants detected by the <em>de novo</em> algorithm
-gets a missing posterior probability ('-'). Since the output is sorted
-on the posterior probability, these will end up at the bottom of the
-list.
-</dd><br>
+but the posterior probabilities may be less accurate.</dd><br>
 
 <dt><strong>
 Output filters
 </strong></dt><dd>
 The purpose of these filters is to reduce the
 number of false positives in the output. A true heterozygous <em>de novo</em>
-variant is expected to present with ALT/REF ratio close to 50% in the
+variant is expected to present with ALT percentage close to 50% in the
 child, and 0% in the parents. In practice some slack is recommended,
 e.g. child &gt; 30% and parents &lt; 5%.<br><br>
 One may experiment
-with these filters for other purposes too: For example, to look for de
-novo mosaic variants in the child one could try a very loose cutoff for
+with these filters for other purposes too: For example, to look for <em>de novo</em> 
+mosaic variants in the child one could try a very loose cutoff for
 the child, e.g. child &gt; 10%, while requiring parents = 0%. Or
 oppositely, for variants inherited from a mosaic parent, something like
 parents &lt; 25% and child &gt; 40% would be sensible, without
@@ -121,6 +119,50 @@ A summary of the findings is printed here. The identified variants are shown in 
 To save the results, first close the <em>de novo</em> dialog, and then select Save main window content in the File menu.</p>
 <p><em>Tip 2:</em> 
 When browsing variants in the main FILTUS window, you can right click on any particular variant to see details about that variant for all the samples.</p>
+
+<h2 id="example" style="color: black;">Example</h2>
+<p>Among the testfiles included in the FILTUS package is the file <em>trioHG002_22X.vcf</em>, 
+which contains variants on chromosomes 22 and X from the exome sequencing of a trio. The variants are annotated with Annovar.
+(The trio is the Jewish trio from the Genome in a Bottle Consortium, described <a href="http://biorxiv.org/content/early/2015/09/15/026468">here</a>.
+The complete exome sequencing variant set, is publically available from this
+<a href="ftp://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/data/AshkenazimTrio/analysis/OsloUniversityHospital_Exome_GATK_jointVC_11242015">ftp site</a>.)<br>
+<br>
+The following steps shows a typical <em>de novo</em> analysis in FILTUS.
+<ol>
+<li>Load the <em>trioHG002_22X.vcf</em> file in the <em>testfiles</em> folder. Make sure the "Keep 0/0" box is checked.
+</li>
+<li>To remove the worst noice, apply column filters "VCF_FILTER - equal to - PASS" and "DP - greater than - 9".
+</li>
+<li>Find out who's who in the trio: Open the QC plot dialog (in the <em>Analysis</em> menu) and just press the first "Plot!" button.
+The Private variants plot should convince you that sample 1 is the child, which in combination with the Gender plot implies that the sample order is
+1=boy, 2=father, 3=mother.
+</li>
+<li>Close the plot dialog and open the <em>de novo</em> dialog. Enter the sample order and child gender as deduced above, 
+and choose "1000g2014oct_all" as the allele frequency column.</li>
+<li>Press Compute.
+</li></ol>
+If you didn't set any output thresholds, the summary display should say that 4 variants were found. To examine them, first close the dialog. 
+By right clicking any individual variant you'll see genotype details from all loaded samples about that variant.<br><br>
+A few words about interpreting the findings: 
+<ul>
+<li>The top two variants are listed with posterior probability 1. However, they both have lower ALT percentage (ca 38%) 
+than you would expect from a heterozygous <em>de novo</em> variant. The fact they are only 52 basepairs apart is a bit suspicious, 
+and we see from the <em>genomicSuperDups</em> column that they are in a region of segmental duplication. 
+All in all, it is quite likely that both of these are false positives.</li>
+<li>The third variant has posterior probability 0, and is almost certainly a false positive. This is a tri-allelic variant, 
+where the TAA > TA change is reported to be <em>de novo</em>. If you right click on the variant you will see that both parents actually has
+plenty of reads with the alledged <em>de novo</em> allele.
+(Note about the alleles: Don't look at the "Ref" and "Alt" columns, which are added by Annovar and do not preserve multiple alternative alleles in this file. 
+The correct allele columns are "VCF_REF" and "VCF_ALT" much further to the right.)
+</li>
+<li>The ALT percentages of the fourth variant look very convincing, so why does it have posterior probability 0? 
+The problem is the father: According to the details, he has 365 REF reads and 0 ALT, but for some reason the genotype quality GQ is 0. 
+This could be a mapping problem (perhaps related to the fact that the variant is a fairly long insertion - or segmental duplication), or something else. 
+Anyway it would be worth investigating closer.</li>
+</ul>
+In summary: 1) Posterior probabilities should be taken with a grain of salt, and 
+2) If you have access to the BAM files, a closer look at the actual reads (e.g. in IGV or similar software) is always a good idea.
+
 
 <h2 id="algorithm" style="color: black;">Algorithm</h2><p>
 FILTUS uses the GT field of the genotype columns to recognize the following <em>de novo</em> genotype patterns (father + mother = child):
