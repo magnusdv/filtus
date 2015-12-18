@@ -161,6 +161,7 @@ class GeneSharingResult(ColumnData):
     def geneMaster(cls, geneMaster, nSamples, minSampleCount=1, genelengths={}, model="Dominant", meta=''):
         intlist2string = FiltusUtils.intlist2string
         shareCounts, data = [0]*nSamples, []
+        if genelengths is None: genelengths = {}
         M = float(len(genelengths))
         totL = float(sum(genelengths.itervalues()))
         

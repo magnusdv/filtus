@@ -2199,8 +2199,8 @@ class DeNovo_GUI(Pmw.Dialog):
         ALTframe.columnconfigure(0, weight=1)
         
         Tkinter.Label(ALTframe, text="Percentage of reads with ALT allele:").grid(rowspan=2, sticky='nsw', padx=(10,5), pady=5)
-        self._minALTchild_entry = Pmw.EntryField(ALTframe, label_text = "Child >", value='30', **entry_opt)
-        self._maxALTparent_entry = Pmw.EntryField(ALTframe, label_text = "Parents <", value='10', **entry_opt)
+        self._minALTchild_entry = Pmw.EntryField(ALTframe, label_text = "Child >", value='', **entry_opt)
+        self._maxALTparent_entry = Pmw.EntryField(ALTframe, label_text = "Parents <", value='', **entry_opt)
         
         self._minALTchild_entry.grid(row=0, column=1, padx=(0,10), pady=2, sticky='w')
         self._maxALTparent_entry.grid(row=1, column=1, padx=(0,10), pady=2, sticky='w')
