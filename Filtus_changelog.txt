@@ -2,10 +2,18 @@
     FILTUS Changelog
 =========================
 
+Version 1.0.2. Date 18.12.2015
+--------------------------------
+
+NEW FEATURES:
+* Added example in the "de novo" help page. Uses the file "trioHG002_22X.vcf" in the "testfiles" folder, containing variants on chromosome 22 and X from a Genome-in-a-bottle trio.
+
+
 Version 1.0.1. Date 15.12.2015
 --------------------------------
 
 OTHER:
+* Increased default font size
 * Bug fixes and clean-ups.
 
 
@@ -17,6 +25,8 @@ NEW FEATURES:
 * De novo dialog: Added a gender selector for the child, which is important for correct handling of X-linked variants.
 
 OTHER:
+* Renamed "example_files" folder to "testfiles"
+* New "data" folder, containing genelengths and genetic map distances.
 * Lots of minor changes in preparation for publication.
 
 
