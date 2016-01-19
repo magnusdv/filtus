@@ -256,6 +256,9 @@ class AdvancedLoad(object):
                 dialogchildsite_padx=0, dialogchildsite_pady=0, activatecommand=self.updateFilelist)
         self.dialog.withdraw()
         interior0 = self.dialog.interior()
+        interior0.columnconfigure(0, weight=1)
+        interior0.rowconfigure(0, weight=1)
+        
         interior = Tkinter.Frame(interior0) #self.dialog.interior()
         interior.grid(row=0, column=0, padx=20, pady=10, sticky='news')
         HelpButton(interior0, filtus=filtus, page="loading", bookmark="advanced").grid(row=0, column=0, sticky="ne")
@@ -1085,7 +1088,7 @@ class SummaryBox(LabeledListBox):
         VF = self.VFlist[selec]
         filtus = self.filtus
         filtus.busy()
-        meta = FiltusUtils.preambleNY(VFlist=[VF], sort=False)
+        meta = FiltusUtils.composeMeta(VFlist=[VF], sort=False)
         rightClick = "variantMenu" if VF.isVCFtype else None
         labelstart =  'Unfiltered variants: ' if self._topString.get().startswith("Unfilt") else 'Variants after filtering: '
         filtus.text.prettyPrint(VF, rightClick=rightClick, meta=meta, label=labelstart + VF.shortName) # OK to pass on meta in this case
@@ -1801,7 +1804,11 @@ class AutEx_GUI(Pmw.Dialog):
             command=self.execute, activatecommand=self._prepare, buttonbox_pady=10, dialogchildsite_pady=0)
         self.withdraw()
         interior0 = self.interior()
+        interior0.columnconfigure(0, weight=1)
+        interior0.rowconfigure(0, weight=1)
         interior = Tkinter.Frame(interior0) #self.interior()
+        interior.columnconfigure(0, weight=1)
+        interior.rowconfigure(0, weight=1)
         interior.grid(row=0, column=0, pady=10, sticky='news')
         HelpButton(interior0, filtus=filtus, page="autex").grid(row=0, column=0, sticky="ne")
         
@@ -1814,7 +1821,7 @@ class AutEx_GUI(Pmw.Dialog):
         self.VF = None
         
         # Title label
-        Tkinter.Label(interior, text='Autozygosity mapping', font=filtus.titlefont).grid(padx=20, pady=10)
+        Tkinter.Label(interior, text='Autozygosity mapping', font=filtus.titlefont).grid(padx=20, pady=10, sticky="new")
         
         entry_opt = dict(entry_width=6, labelpos='w', labelmargin=5, entry_justify="center")
         grid_opt = dict(padx=10, pady=5, sticky='news')
@@ -1847,7 +1854,7 @@ class AutEx_GUI(Pmw.Dialog):
         # Output options
         out_group = Pmw.Group(interior, tag_text = 'Output')
         out_interior = out_group.interior()
-        
+        out_interior.columnconfigure(3, weight=1)
         self._thresh_entry = Pmw.EntryField(out_interior, label_text = "Posterior threshold:", value='0.5', **entry_opt)
         self._minlength_entry = Pmw.EntryField(out_interior, label_text = "Minimum segment size:", value='0',**entry_opt)
         self._unitmenu = Pmw.OptionMenu(out_interior, items=['Mb*','Mb','cM*','cM'], initialitem=2, menubutton_anchor = 'e', menubutton_width = 4, menubutton_padx=0, menubutton_pady=1)
@@ -1864,8 +1871,10 @@ class AutEx_GUI(Pmw.Dialog):
         below = Tkinter.Frame(interior)
         below.columnconfigure(0, weight=1)
         below.columnconfigure(1, weight=1)
+        below.rowconfigure(0, weight=1)
         summary_group = Pmw.Group(below, tag_text = 'Summary')
         summary_interior = summary_group.interior()
+        summary_interior.rowconfigure(0, weight=1)
         self.summary = Pmw.ScrolledText(summary_interior, columnheader=1, columnheader_padx=2, columnheader_width = 42, text_wrap='none', text_padx=3, text_pady=3,
                         text_height=5, text_font=filtus.monofont, #labelpos='nw', label_text='Summary', 
                         text_width=42, borderframe=0, scrollmargin=0, vscrollmode='none', hscrollmode='none')
@@ -1874,6 +1883,7 @@ class AutEx_GUI(Pmw.Dialog):
         
         plot_group = Pmw.Group(below, tag_text = 'Plot')
         plot_interior = plot_group.interior()
+        plot_interior.rowconfigure(0, weight=1)
         self.plotCHR = OptionMenuExt(plot_interior, label_text = "Chrom:", menubutton_padx=1, menubutton_anchor="e", menubutton_pady=1, menubutton_width=3, 
                         labelmargin = 1, labelpos='nw')
         self.plotButton = Tkinter.Button(plot_interior, text="Plot now!", command=self.plot, width=5)
@@ -1894,8 +1904,10 @@ class AutEx_GUI(Pmw.Dialog):
         Pmw.alignlabels([self.inbreedingOM, self._thresh_entry, self._minlength_entry]) #self.plotCHR, 
         
         for g in [param_group, freq_group, out_group, summary_group, plot_group]:
-            g.interior().columnconfigure(0, weight=1)
             g.configure(tag_font = filtus.smallbold)
+            if g in not out_group:
+                g.interior().columnconfigure(0, weight=1)
+            
             
             
     def plot(self):
@@ -2139,6 +2151,9 @@ class DeNovo_GUI(Pmw.Dialog):
             command=self.execute, activatecommand=self._prepare, buttonbox_pady=10, dialogchildsite_pady=0)
         self.withdraw()
         interior0 = self.interior()
+        interior0.columnconfigure(0, weight=1)
+        interior0.rowconfigure(0, weight=1)
+        
         interior = Tkinter.Frame(interior0) #self.dialog.interior()
         interior.columnconfigure(0, weight=1)
         interior.grid(row=0, column=0, pady=10, sticky='news')
@@ -2212,6 +2227,7 @@ class DeNovo_GUI(Pmw.Dialog):
         
         summary_group = Pmw.Group(interior, tag_text = 'Summary')
         summary_interior = summary_group.interior()
+        summary_interior.rowconfigure(0, weight=1)
         self.summary = Pmw.ScrolledText(summary_interior, columnheader=0, text_height=2, text_font=filtus.monofont, text_wrap='none', text_padx=3, text_pady=3,
                         text_width=50, borderframe=0, scrollmargin=0, vscrollmode='none', hscrollmode='none')
         makeReadOnly(self.summary.component('text'))

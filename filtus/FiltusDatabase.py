@@ -59,7 +59,7 @@ class TwoListWidget(Pmw.MegaWidget):
         self._rightlist = self.createcomponent('rightlist', (), None, FiltusWidgets.LabeledListBox, (interior,), filtus=filtus,
                                 toptext="Selected: 0", bottomtext="Double click entry to edit names", width=self['width'], 
                                 height=self['height'], scrolledlistbox_selectioncommand=self.setButtonStates,
-                                scrolledlistbox_dblclickcommand=self._editdialog.activate)
+                                scrolledlistbox_dblclickcommand=self.showEditDialog)
                                 
         self._buttonColumn =  self.createcomponent('buttoncolumn', (), None, Pmw.ButtonBox, (interior,), orient="vertical")
         
@@ -133,6 +133,11 @@ class TwoListWidget(Pmw.MegaWidget):
              box2.delete(i)
              del self.selection[i]
         box2.settoptext("Selected: %d" % box2.size())
+     
+    def showEditDialog(self):
+        if not self._rightlist.size():
+            return
+        self._editdialog.activate()
         
     def insertselected(self):
         box2 = self._rightlist
@@ -240,7 +245,7 @@ class DBpage_new(Tkinter.Frame):
             raise RuntimeError("No samples selected")
         if not outFilename:
             raise RuntimeError("Please specify output file name and format")
-        db = VariantDatabase.buildFromSamples(filtus, VFlist, outFormat, sampleNames)
+        db = VariantDatabase.buildFromSamples(VFlist, outFormat, sampleNames)
         db.save(outFilename)
         message = "Variant database written to %s.\n\n" % outFilename \
                 + "\n".join(db.infoSummary()) \
@@ -381,7 +386,7 @@ class DBpage_add(Tkinter.Frame):
         if not outFilename:
             raise RuntimeError("Please specify output file name and format")
         newmeta = ''
-        db = VariantDatabase.readFileAndAdd(filtus, inFilename, inFormat=inFormat, 
+        db = VariantDatabase.readFileAndAdd(inFilename, inFormat=inFormat, 
             inNS=inNS, outFormat=outFormat, VFlist=VFlist, sampleNames=sampleNames)
         if db.nSamples == inNS: raise IndexError("No samples to add")
         db.save(outFilename)
@@ -496,7 +501,7 @@ class DBpage_extract(Tkinter.Frame):
                 raise RuntimeError("No samples selected")
             if not outFilename:
                 raise RuntimeError("Please specify output file name and format")
-            db = VariantDatabase.readFileAndExtract(self.filtus, inFilename, inFormat, inNS, 
+            db = VariantDatabase.readFileAndExtract(inFilename, inFormat, inNS, 
                     subset, sampleNames, outFormat, filter=filter)
             
             db.save(outFilename)
@@ -554,9 +559,9 @@ class DBpage_search(Tkinter.Frame):
     def save(self):
         if self.results is None: return
         filtus = self.filtus
-        db_summary = '## Database file: %s\n## Format: %s\n## Number of samples: %d\n## Number of variants: %d\n##\n' %(self.filename, self.format, self.nSamples, self.nVariants)
+        db_summary = '## Database file: %s\n## Format: %s\n## Number of samples: %d\n## Number of variants: %d\n##\n' %(self.filename, self.formatLong, self.nSamples, self.nVariants)
         query = '## Query: Chromosome %s, position: %s' % tuple(self.query)
-        meta = FiltusUtils.preambleNY(VFlist=None, analysis="VARIANT DATABASE - SEARCH\n##\n" + db_summary + query)
+        meta = FiltusUtils.composeMeta(VFlist=None, analysis="VARIANT DATABASE - SEARCH\n##\n" + db_summary + query)
         
         fname = tkFileDialog.asksaveasfilename(initialdir=filtus.currentDir, title = "Save search results as")
         if not fname:
@@ -603,7 +608,7 @@ class DBpage_search(Tkinter.Frame):
         self.filename = inFilename
         self.nSamples = inNS
         self.nVariants = inNV
-        self.format = inFormat
+        self.formatLong = inFormat
         self.colNames = self.browser.getColnames()
         
         try:
@@ -623,7 +628,7 @@ class DBpage_search(Tkinter.Frame):
             results = ['%s: %s' %x for x in zip(fields, data[2:6])]
             results[0] += ' (out of %d)' % inNS
             
-            if self.format=="Extended":
+            if self.formatLong == "Extended":
                 allSamples = self.colNames[-inNS:]
                 allObs = map(int, data[-inNS:])
                 observations = [(s, obs) for s, obs in zip(allSamples, allObs) if obs != 0]
@@ -660,6 +665,7 @@ class VariantDatabase(DataContainer.ColumnData):
         self.sort(column=self.columnNames[0], descending=False)
         
         self.format = format
+        self.formatLong = 'Simple' if format =='S' else 'Extended'
         self.nSamples = nSamples
         self.sampleNames = columnNames[6:]
         if format=="E" and len(self.sampleNames) != nSamples:
@@ -715,7 +721,7 @@ class VariantDatabase(DataContainer.ColumnData):
         if outFormat=="E":
             if sampleNames is None: sampleNames = [VF.shortName for VF in VFlist]
             colNames += sampleNames
-        meta = FiltusUtils.preambleNY(VFlist=VFlist, analysis = "NEW VARIANT DATABASE", sort=False)
+        meta = FiltusUtils.composeMeta(VFlist=VFlist, analysis = "NEW VARIANT DATABASE", sort=False)
         
         return cls(outFormat, nSamples=N, columnNames=colNames, extendedDict=extended, meta=meta)
     
@@ -728,7 +734,7 @@ class VariantDatabase(DataContainer.ColumnData):
         if inFormat == "S":
             old = VariantDatabase.loadSimple(filename, inNS)
             new = VariantDatabase.buildFromSamples(VFlist, outFormat, sampleNames)
-            meta = FiltusUtils.preambleNY(VFlist=VFlist, analysis="ADDED TO DATABASE", sort=False, appendTo=old.meta)
+            meta = FiltusUtils.composeMeta(VFlist=VFlist, analysis="ADDED TO DATABASE", sort=False, appendTo=old.meta)
             return old.addSimple(new, meta=meta)
         
         N_add = len(VFlist)
@@ -772,7 +778,7 @@ class VariantDatabase(DataContainer.ColumnData):
                     del sampleNames[k]
                     extended.default_factory = lambda: [0]*len(sampleNames)
         
-        new_meta = FiltusUtils.preambleNY(VFlist = [VF for VF in VFlist if not VF in skip], sort=False, 
+        new_meta = FiltusUtils.composeMeta(VFlist = [VF for VF in VFlist if not VF in skip], sort=False, 
                                           analysis = "ADDED TO DATABASE", appendTo='\n'.join(meta))
         colNames = simpleColnames + sampleNames
         return cls(outFormat, nSamples=len(sampleNames), columnNames=colNames, extendedDict=extended, meta=new_meta)
@@ -827,7 +833,6 @@ class VariantDatabase(DataContainer.ColumnData):
 
         return VariantDatabase("Simple", nSamples=N, columnNames=self.columnNames[:], variantMatrix=newvars, meta=meta)
         
-        
     def convertFromDict(self, dic, format, Ndip):
         '''takes dict in extended format into matrix, adding stats columns'''
         
@@ -850,7 +855,6 @@ class VariantDatabase(DataContainer.ColumnData):
         allvars = []
         with open(filename, 'rU') as dbfil:
             meta, colNames, dbfil = _readTop(dbfil)
-            
             if not colNames or len(colNames) < 5:
                 raise RuntimeError("I don't think this is a database file.")
             if any(col not in colNames for col in ('OBS', 'HET', 'HOM', 'AFREQ')):
@@ -867,10 +871,14 @@ class VariantDatabase(DataContainer.ColumnData):
             nVariants = int(meta[-3].split(':')[1])
             format = meta[-2].split(':')[1].strip()
    
-            if format == "Simple" and len(sampleNames) > 0:
-                raise RuntimeError("Database error: Format is inconsistent with column names.")
-            if format == "Extended" and nSamples != len(sampleNames):
-                raise RuntimeError("Number of samples is inconsistent with column names")
+            if format == "Simple":
+                if len(sampleNames) > 0:
+                    raise RuntimeError("Database error: Format is inconsistent with column names.")
+            elif format == "Extended":
+                if nSamples != len(sampleNames):
+                    raise RuntimeError("Number of samples is inconsistent with column names")
+            else:
+                raise RuntimeError('Unknown format: %s.\n\n(Should be either "Simple" or "Extended".)' % format)
         else:
             general = ''
             if len(sampleNames)==0:
@@ -878,19 +886,18 @@ class VariantDatabase(DataContainer.ColumnData):
                 v = allvars[0].strip().split('\t')[:afreq_ind + 1]
                 nSamples = round((int(v[-3]) + 2*int(v[-2]))/(2*float(v[-1])))
             else:
-                fornat = "Extended"
+                format = "Extended"
                 nSamples = len(sampleNames)
             nVariants = len(allvars)
                 
         return general, nSamples, nVariants, format, colNames
      
-    
     def infoSummary(self):
-        return ['Samples: %d' % self.nSamples, 'Variants: %d'% self.length, 'Format: %s' % self.format]
+        return ['Samples: %d' % self.nSamples, 'Variants: %d'% self.length, 'Format: %s' % self.formatLong]
         
     def save(self, outFilename, sep='\t', colnames=True, preamblePos=("Top",)): 
         info = self.infoSummary()
-        meta = self.meta + '##  ' + '\n##  '.join(info) + '\n##\n'
+        self.meta = self.meta + '##  ' + '\n##  '.join(info) + '\n##\n'
         DataContainer.ColumnData.save(self, outFilename, sep=sep, colnames=colnames, preamblePos=preamblePos)
         
 def formatInit(format):
@@ -932,12 +939,11 @@ To extend this database, make sure to indicate matching columns in the "Columns 
 if __name__=='__main__':
     import VariantFileReader
     reader = VariantFileReader.VariantFileReader()
-
-    vcftest = "C:\\Projects\\FILTUS\\Testfiles\\vcf_example2.vcf"
-    VFlist = reader.readVCFlike(vcftest, sep="\t", chromCol="CHROM", posCol="POS", geneCol="Gene_INFO", splitAsInfo="INFO", keep00=0)
+    vcftest = "testfiles\\vcf_test.vcf"
+    VFlist = reader.readVCFlike(vcftest, sep="\t", chromCol="CHROM", posCol="POS", geneCol="", splitAsInfo="", keep00=0)
     dbe = VariantDatabase.buildFromSamples(VFlist, "Ex")
-    dbe.save("kast.txt")
-    dbs1 = VariantDatabase.readFileAndAdd("kast.txt", inFormat="E", inNS=3, outFormat="S", VFlist=VFlist)
-    dbs1.save("kast2.txt")
+    dbe.save("__test1.txt")
+    dbs1 = VariantDatabase.readFileAndAdd("__test1.txt", inFormat="E", inNS=3, outFormat="S", VFlist=VFlist)
+    dbs1.save("__test2.txt")
     dbs2 = VariantDatabase.buildFromSamples(VFlist, "S")
     

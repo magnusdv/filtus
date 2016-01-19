@@ -405,6 +405,8 @@ class FiltusGUI(object):
 
     def database_prompt(self, pgnr):
         def _f():
+            if pgnr in [0,1] and not self.checkLoadedSamples(select="all"):
+                return
             if not hasattr(self, 'databaseTool'):
                 self.databaseTool = FiltusDatabase.DatabaseWidget(self)
             self.databaseTool.notebook.selectpage(pgnr)
@@ -683,7 +685,7 @@ def main():
         '''checks that the correct version number is used when saving output files'''
         print "Testing version number........",
         import inspect
-        a = inspect.getargspec(FiltusUtils.preambleNY) # version number is the last argument of this function
+        a = inspect.getargspec(FiltusUtils.composeMeta) # version number is the last argument of this function
         save_version = a.defaults[-1]
         assert save_version == filtus.version
         print "ok"
@@ -745,6 +747,58 @@ def main():
         #print time.time()-st
         assert res1.length == res2.length
         assert all(a[0]==b[0] for a,b in zip(res1.variants, res2.variants))
+        print "ok"
+    
+    def test_db():
+        print "Testing databases........",
+        filtus.clearAll()
+        readMeta = FiltusDatabase.VariantDatabase.readMeta
+        db = FiltusDatabase.DatabaseWidget(filtus)
+        new, add, extract, search = db.notebook.page(0), db.notebook.page(1), db.notebook.page(2), db.notebook.page(3)
+        filtus.loadFiles([test_vcf], guess=1, prompt=0, splitAsInfo="", keep00=0)
+        filtus.checkLoadedSamples(select="all")
+        db._prepare()
+        
+        for format, ending in zip(['Extended', 'Simple'], ['.dbe', '.dbs']):
+            new.lists.selectAll()
+            new.formatSelect.invoke(format)
+            new.save_browser.entryfield.setvalue("__test1" + ending)
+            new.createdb()
+        
+        filtus.loadFiles(test_csv, guess=1, prompt=0, splitAsInfo="", keep00=0)
+        filtus.checkLoadedSamples(select="all")
+        db._prepare()
+            
+        for format, ending in zip(['Extended', 'Simple'], ['.dbe', '.dbs']):
+            new.lists.selectAll()
+            new.formatSelect.invoke(format)
+            new.save_browser.entryfield.setvalue("__test2" + ending)
+            new.createdb()
+            
+        for format, ending in zip(['Extended', 'Simple'], ['.dbe', '.dbs']):
+            add.browser.browser.setvalue("__test1" + ending)
+            add.browser.loadMeta_and_update()
+            add.lists._leftlist.selection_set(3,4)
+            add.lists.select()
+            add.formatSelect.invoke(format)
+            add.save_browser.entryfield.setvalue("__test3" + ending)
+            add.addSamples()
+            assert readMeta("__test2" + ending)[1:] == readMeta("__test3" + ending)[1:]
+            
+        extract.browser.browser.setvalue("__test2.dbe")
+        extract.browser.loadMeta_and_update()
+        extract.lists._leftlist.selection_set(0,2)
+        extract.lists.select()
+        for format, ending in zip(['Extended', 'Simple'], ['.dbe', '.dbs']):
+            extract.formatSelect.invoke(format)
+            extract.save_browser.entryfield.setvalue("__test4" + ending)
+            extract.extractdb()
+            assert readMeta("__test1" + ending)[1:] == readMeta("__test4" + ending)[1:]
+        
+        for i in [1,2,3,4]:
+            for ending in ['.dbe', '.dbs']:
+                file = "__test%d%s" %(i, ending)
+                if os.path.exists(file): os.remove(file)
         print "ok"
         
     def test_autex():
