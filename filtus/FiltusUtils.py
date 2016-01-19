@@ -19,7 +19,7 @@ def activateInCenter(parent, widget):
     y = offy + height/8
     return widget.activate(geometry='+%d+%d' %(x, y))
 
-def composeMeta(VFlist=None, VFindex=None, sort=True, analysis=None, appendTo=None, version='1.0.2'):
+def composeMeta(VFlist=None, VFindex=None, sort=True, analysis=None, appendTo=None, version="1.0.3"):
     txt = '###############################################################\n' \
           '####  FILTUS %s, analysis performed %s  ####\n' \
           '###############################################################\n' \

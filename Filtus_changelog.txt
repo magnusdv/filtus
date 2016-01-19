@@ -2,6 +2,13 @@
     FILTUS Changelog
 =========================
 
+Version 1.0.3. Date 19.01.2016
+--------------------------------
+
+BUG FIX:
+* Database module was partly broken, should be ok now.
+
+
 Version 1.0.2. Date 18.12.2015
 --------------------------------
 

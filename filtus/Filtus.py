@@ -5,7 +5,7 @@
 #----------------------------------------------------------------
 
 PROGRAM_NAME = "FILTUS"
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 import gc
 import sys
@@ -888,7 +888,8 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1].startswith("test"):
         if sys.argv[1] == "test":
             test_denovo()
-            test_version()
+            #test_version()
+            test_db()
             test_loading()
             test_advancedload()
             test_summary()

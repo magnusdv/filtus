@@ -1905,7 +1905,7 @@ class AutEx_GUI(Pmw.Dialog):
         
         for g in [param_group, freq_group, out_group, summary_group, plot_group]:
             g.configure(tag_font = filtus.smallbold)
-            if g in not out_group:
+            if g is not out_group:
                 g.interior().columnconfigure(0, weight=1)
             
             
