@@ -309,7 +309,7 @@ def QC_3plots(VFlist, gender=True, private=True, heterozygosity=True, writetofil
     
     if writetofile:
         sep = '\t'
-        text_out = FiltusUtils.preambleNY(VFlist, analysis="QC PLOTS")
+        text_out = FiltusUtils.composeMeta(VFlist, analysis="QC PLOTS")
         
     plotnr = 0
     if gender:

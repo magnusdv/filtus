@@ -27,7 +27,7 @@ def geneLookup(genes, VFlist):
         else:
             result.addData(VF.geneVars(genes, index=i))
     
-    result.meta = FiltusUtils.preambleNY(VFlist=VFlist, analysis='GENE LOOKUP\n## Genes: %s' % ', '.join(genes))
+    result.meta = FiltusUtils.composeMeta(VFlist=VFlist, analysis='GENE LOOKUP\n## Genes: %s' % ', '.join(genes))
     return result
     
 def genotypeData(vdef, VFlist):
@@ -41,7 +41,7 @@ def genotypeData(vdef, VFlist):
         else: values.append(['']*len(headers))
     
     descr = VFlist[0].columnDescriptions
-    meta = FiltusUtils.preambleNY(VFlist=VFlist, analysis='SINGLE VARIANT - UNFILTERED DATA FROM ALL SAMPLES\n## Chromosome: %s\n## Position: %s' %vdef)
+    meta = FiltusUtils.composeMeta(VFlist=VFlist, analysis='SINGLE VARIANT - UNFILTERED DATA FROM ALL SAMPLES\n## Chromosome: %s\n## Position: %s' %vdef)
     result = DataContainer.ColumnData(columnNames=headers, variants=values, columnDescriptions=descr, meta=meta)
     return result
             
@@ -295,11 +295,11 @@ def pairwiseSharing(seleci, filtus):
     text.tag_add('bold', '%d.0'%(line - 1,), '%d.end'%(line-1,))
     for i in range(line, line + n):
         text.tag_add('bold', '%d.0'%i, '%d.0 wordend'%i)
-    text.meta = FiltusUtils.preambleNY(VFlist=VFlist, VFindex=seleci, analysis="PAIRWISE VARIANT SHARING")
+    text.meta = FiltusUtils.composeMeta(VFlist=VFlist, VFindex=seleci, analysis="PAIRWISE VARIANT SHARING")
 
     
 def merge(VFlist, collapse):
-    meta = FiltusUtils.preambleNY(VFlist=VFlist, analysis="MERGED SAMPLES - UNIQUE VARIANTS" if collapse else "MERGED SAMPLES")
+    meta = FiltusUtils.composeMeta(VFlist=VFlist, analysis="MERGED SAMPLES - UNIQUE VARIANTS" if collapse else "MERGED SAMPLES")
     resVF = VFlist[0].copyAttributes(meta=meta)
     for VF in VFlist[1:]:
         resVF.addData(VF)
@@ -384,7 +384,7 @@ class ColumnSummary(object):
                     percents = ['%.2f' %(dic[h]/float(VF.length)*100,) if h in dic else 0 for h in headers]
                     x = info + [dic[h] if h in dic else 0 for h in headers] + percents
                 listlist.append(x)
-        meta = FiltusUtils.preambleNY(VFlist=VFlist, analysis="SUMMARY OF COLUMN '%s'"% column)
+        meta = FiltusUtils.composeMeta(VFlist=VFlist, analysis="SUMMARY OF COLUMN '%s'"% column)
         res = DataContainer.ColumnData(allheaders, variants = listlist, meta=meta)
         return res
 
@@ -482,7 +482,7 @@ class GeneSharingComputer(object):
                     intlist2string([i + 1 for i in VFcontrols_index]))
         if minSampleCount > 1: 
             analys_txt += "\n## Minimum number of affected: %d" % minSampleCount
-        meta = FiltusUtils.preambleNY(VFlist=VFcases+VFcontrols, VFindex=VFcases_index+VFcontrols_index, analysis=analys_txt)
+        meta = FiltusUtils.composeMeta(VFlist=VFcases+VFcontrols, VFindex=VFcases_index+VFcontrols_index, analysis=analys_txt)
         result = DataContainer.GeneSharingResult.geneMaster(gD, nSamples=len(VFcases), minSampleCount=minSampleCount, 
                                                             genelengths=genelengths, model=model, meta=meta)
         result.sort(column='SampleCount', descending=True)
@@ -522,7 +522,7 @@ class VariantSharingComputer(object):
         heads = (VF_inputs[1]+VF_inputs[2]+VF_inputs[4])[0].varDefColNames
 
         analys_txt = "VARIANT SHARING\n## " + '\n## '.join('%s alleles: %s' %(a, ', '.join(str(i + 1) for i in field))  for a, field in zip(['0', '1', '2', '0/1', '1/2'], VF_index_list))
-        meta = FiltusUtils.preambleNY(VFlist=[VF for input in VF_inputs for VF in input], VFindex=[i for field in VF_index_list for i in field], analysis = analys_txt)
+        meta = FiltusUtils.composeMeta(VFlist=[VF for input in VF_inputs for VF in input], VFindex=[i for field in VF_index_list for i in field], analysis = analys_txt)
         
         result = DataContainer.ColumnData(heads, variants = list(shared_vdefs))
         result.sort(column=heads[1], descending=False)
@@ -800,7 +800,7 @@ class DeNovoComputer(object):
         
         analys_txt = "DE NOVO\n## Child: %d\n## Father: %d\n## Mother: %d\n" % tuple(i+1 for i in trioID)
         analys_txt += "## Mutation rate: %g\n## %s" % (mut, str(freq))
-        meta = FiltusUtils.preambleNY(VFlist=[VFch, VFfa, VFmo], VFindex=trioID, analysis = analys_txt)
+        meta = FiltusUtils.composeMeta(VFlist=[VFch, VFfa, VFmo], VFindex=trioID, analysis = analys_txt)
         
         resultVF = VFch.copyAttributes(columnNames=heads, variants = denovo, filename=None, meta=meta)
         resultVF.sort(column=heads[0], descending=True)
@@ -876,7 +876,7 @@ class NgTable(object):
             coldat = self.computeVariantTable(VFall, fields, filterSteps, indiv_step)
 
         data = DataContainer.NgData(coldat, self.title, subtitle)
-        meta = FiltusUtils.preambleNY(VFlist=VFall, analysis=data.analysis_text)
+        meta = FiltusUtils.composeMeta(VFlist=VFall, analysis=data.analysis_text)
         self.filtus.text.prettyPrint(data, meta=meta, label="Filter table")
 
     def execute(self, button):
@@ -1064,7 +1064,7 @@ class AutExComputer(object):
             chrres = [[chr] + seg for seg in segs]
             segments.extend(chrres)
         
-        meta = FiltusUtils.preambleNY(VFlist=[VF], analysis = self.meta_string(f,a,error,freq,threshold=threshold, minlength=minlength, unit=unit, mincount=mincount, overrule_count=overrule_count))
+        meta = FiltusUtils.composeMeta(VFlist=[VF], analysis = self.meta_string(f,a,error,freq,threshold=threshold, minlength=minlength, unit=unit, mincount=mincount, overrule_count=overrule_count))
         res = DataContainer.ColumnData(variants=segments, columnNames=['CHR', 'FROM*', 'TO*', 'MB*', 'CM*', 'FROM', 'TO', 'MB', 'CM', 'N'], meta=meta)
         res.sort(column="FROM*")
         res.sort(column="CHR")

@@ -40,17 +40,17 @@ class VariantFileReader(object):
 
     def readVCFlike(self, filename, sep, chromCol, posCol, geneCol, keep00=0, split_general=[],
                     splitAsInfo="", formatCol="FORMAT", splitFormat=1, commentChar="##", prefilter=None):
-        preamble = []
+        preambleLines = []
         with open(filename, "rU") as ifile:
             line = ifile.next()
             while commentChar and line.startswith(commentChar):
-                preamble.append(line)
+                preambleLines.append(line)
                 line = ifile.next()
             headers = [h.strip() for h in line.split(sep)]
             if prefilter is not None: 
                 ifile = self._applyPrefilter(ifile, prefilter)
             data = [row for row in csv.reader(ifile, delimiter = sep, skipinitialspace = False, strict=True)] # saving time (?) with skip.. = False
-        descriptions = self._parseDescriptions(preamble)
+        descriptions = self._parseDescriptions(preambleLines)
         
         if len(data) == 0: 
             raise RuntimeError("No variants in file")
