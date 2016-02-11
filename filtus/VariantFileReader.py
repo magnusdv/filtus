@@ -9,8 +9,15 @@ class VariantFileReader(object):
         
     def readNonVCF(self, filename, sep, splitAsInfo=None, split_general=None, skiplines=0, prefilter=None, **params): # gtCol, homSymbol:
         with open(filename, "rU") as ifile:
-            for i in range(skiplines): ifile.next()
-            headers = [h.strip() for h in ifile.next().split(sep)] # must do this before prefilter
+            if isinstance(skiplines, (int, long)):
+                for i in range(skiplines): ifile.next()
+                headerline = ifile.next()
+            elif isinstance(skiplines, basestring):
+                line = ifile.next()
+                while line.startswith(skiplines):
+                    line = ifile.next()
+                headerline = line
+            headers = csv.reader([headerline], delimiter = sep, skipinitialspace = True, strict=True).next() # must do this before prefilter
             if prefilter is not None: 
                 ifile = self._applyPrefilter(ifile, prefilter)
             reader = csv.reader(ifile, delimiter = sep, skipinitialspace = True, strict=True)
@@ -46,7 +53,7 @@ class VariantFileReader(object):
             while commentChar and line.startswith(commentChar):
                 preambleLines.append(line)
                 line = ifile.next()
-            headers = [h.strip() for h in line.split(sep)]
+            headers = csv.reader([line], delimiter=sep, skipinitialspace=False, strict=True).next()
             if prefilter is not None: 
                 ifile = self._applyPrefilter(ifile, prefilter)
             data = [row for row in csv.reader(ifile, delimiter = sep, skipinitialspace = False, strict=True)] # saving time (?) with skip.. = False
