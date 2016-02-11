@@ -30,7 +30,7 @@ def transition(dist, a, f, logspace=0):
     Key in dictionary: 0 = not-IBD, 1 = IBD.
     """
     if logspace == 0:
-        qk = e**(-a*dist)
+        qk = exp(-a*dist)
 
         T = { # 0 = not-IBD, 1 = IBD
             1: {1: (1-qk)*f + qk, 0: (1-qk)*(1-f)},

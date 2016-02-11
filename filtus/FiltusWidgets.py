@@ -1625,14 +1625,14 @@ class GeneFile(FileBrowser):
     def __init__(self, parent, filtus, **kw):
         FileBrowser.__init__(self, parent, filtus, **kw)
 
-    @staticmethod
+    @staticmethod #TODO: Move this (and others) to filtusutils!
     def read(string):
         if ';' in string:
             return set.union(*[GeneFile.read(part.strip()) for part in string.split(';')])
         genes = set()
         if os.path.isfile(string):
             with open(string, 'rU') as genfil:
-                genes = set(g.strip() for g in genfil)
+                genes = set(g.strip() for g in genfil if not g.startswith('#'))
         elif len(string)>0:
             genes = set(gen.strip() for gen in string.split(','))
         return genes

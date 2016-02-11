@@ -86,7 +86,7 @@ class Filter(object):
         self.restrict_to_variants, self.restrict_to_variants_original = restrict_to_variants, restrict_to_variants
         self.exclude_genes,        self.exclude_genes_original        = exclude_genes,        exclude_genes
         self.restrict_to_genes,    self.restrict_to_genes_original    = restrict_to_genes,    restrict_to_genes
-
+        
         self.cleanup()
         
         
@@ -96,15 +96,15 @@ class Filter(object):
         exclvar, inclvar = self.exclude_variants_original, self.restrict_to_variants_original
         exclgen, inclgen = self.exclude_genes_original, self.restrict_to_genes_original
         controls, model = self.controls, self.model
-
+        
         if exclvar and inclvar:
             self.restrict_to_variants = inclvar.difference(exclvar)
             self.exclude_variants = None
-
+        
         if exclgen and inclgen:
             self.restrict_to_genes = inclgen.difference(exclgen)
             self.exclude_genes = None
-
+        
         if controls:
             #Dominant: Remove all variants in controls. Both recessive: Remove all homozygous variants. Compound heterozygous: Remove benign pairs.
             if model == 'Dominant':
@@ -118,11 +118,25 @@ class Filter(object):
         txtlist = self.details()
         return '## ' + '\n## '.join(txtlist) if txtlist else "## No filters"
 
-    def details(self): #TODO: include counts 
-        txtlist = ['%s: %s' %(label, val) for label, val in zip( \
-            ['Close variants removal', 'Gene restriction', 'Gene exclusion', 'Variant exclusion', 'Variant restriction', 'Regions'],
-            [self.closePairLimit, self.restrict_genes_txt, self.exclude_genes_txt, self.exclude_var_txt, self.restrict_var_txt, self.regions_txt]) if val]
-
+    def details(self):
+        txtlist = []
+        if self.closePairLimit: txtlist.append('Close variants removal:' + str(self.closePairLimit))
+        if self.restrict_genes_txt: 
+            txtlist.append('Gene restriction: %s (%d genes)' %(self.restrict_genes_txt, len(self.restrict_to_genes_original)))
+        elif self.restrict_to_genes:
+            n = len(self.restrict_to_genes)
+            txtlist.append('Gene restriction: ' + (', '.join(self.restrict_to_genes) if n < 7 else str(n) + ' genes'))
+        
+        if self.exclude_genes_txt: 
+            txtlist.append('Gene exclusion: %s (%d genes)' %(self.exclude_genes_txt, len(self.exclude_genes_original)))
+        elif self.exclude_genes:
+            n = len(self.exclude_genes)
+            txtlist.append('Gene exclusion: ' + (', '.join(self.exclude_genes) if n < 7 else str(n) + ' genes'))
+        
+        if self.exclude_var_txt: txtlist.append('Variant exclusion: %s (%d variants)' %(self.exclude_var_txt, len(self.exclude_variants_original)))
+        if self.restrict_var_txt: txtlist.append('Restrict to variants: %s (%d variants)' %(self.restrict_var_txt, len(self.restrict_to_variants_original)))
+        if self.regions_txt: txtlist.append('Restrict to regions: %s (%d regions)' %(self.regions_txt, len(self.regions)))
+        
         if self.columnfilters_original:
             txtlist.append("Column filters:")
             txtlist.extend(['  ' + ' ::: '.join(map(str, cf)) for cf in self.columnfilters_original])
