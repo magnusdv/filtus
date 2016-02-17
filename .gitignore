@@ -58,5 +58,6 @@ target/
 
 # Magnus test files
 kast*.txt
+autorun.*
 filtus__plink__homozyg.*
 *.R
