@@ -217,7 +217,7 @@ def scatterPlot(VFlist, xcol, ycol, alpha, thin, NA_vals = ('', 'NA', '.', '-'),
             raise ValueError("Cannot plot columns with non-numerical values.\nTip: Use filters to remove non-numerical values before plotting.")
         
         ax = fig.add_subplot(nrow, ncol, i+1, aspect=1)
-        for num, col in zip([0,1,2], ['b','g','r']):
+        for num, col in zip([1,0,2], ['g','b','r']):
             if num==0 and not keep00: continue
             gt_subset = [(x,y) for x,y,gt in floatdata if gt==num]
             if gt_subset:

@@ -372,10 +372,33 @@ def trioRecessiveFilter(VFch, VFfa, VFmo, model):
         homAllele = VFch.homAllele()
         res = []
         for v in VFch.variants:
-            homa = homAllele(v)
-            if homa != '-1' and not (vardef(v), homa) in parHOM:
+            a = alleles(v)
+            a0 = a[0]
+            
+            # if not homozygous or REF/REF or missing, skip to next
+            if (not a[1] == a0) or a0 == '0' or a0 == '.':
+                continue
+                
+            vdef = vardef(v)
+                
+            # Check if homoz in either parent (this step is for speed, could be skipped)
+            if (vdef, a0) in parHOM: 
+                continue
+            
+            # Collect the parental alleles. Error imply missing data. If so: dont include.
+            try:
+                father_alleles = fatherAL[vdef]
+                mother_alleles = motherAL[vdef]
+            except KeyError:
+                continue
+            
+            # If both parents are heterozygous, include in results
+            father_het = sum(fa == a0 for fa in father_alleles) == 1
+            mother_het = sum(mo == a0 for mo in mother_alleles) == 1  
+            if father_het and mother_het:
                 res.append(v)
-    
+        
+                
     elif model == 'Recessive':
         
         # Storage for variants compatible with simple recessive (homozygous) inheritance
@@ -396,41 +419,46 @@ def trioRecessiveFilter(VFch, VFfa, VFmo, model):
             
             vdef = vardef(v)
             
-            ### Part 1: Homozygous
-            # If homozygous in child: store if not homoz for same allele in either parent. In any case, continue to next variant.
+            # Collect the parental alleles. Error imply missing data. 
+            try:
+                father_alleles = fatherAL[vdef]
+                mother_alleles = motherAL[vdef]
+            except KeyError:
+                continue
+                
+            ### Part 1: Homozygous ###
+            
+            # If homozygous in child: store if heterozygous in both parents. In any case, continue to next variant.
             if a[0] == a[1]:
-                if (vdef, a[0]) not in parHOM:
+                a0 = a[0]
+                if (vdef, a0) in parHOM: #check if homoz in either parent (this step is for speed, could be skipped)
+                    continue
+                father_het = sum(fa == a0 for fa in father_alleles) == 1
+                mother_het = sum(mo == a0 for mo in mother_alleles) == 1  
+                if father_het and mother_het:
                     homoz.append(v)
                 continue
         
-            ### Part 2: Compound heterozygous. Use the 5 rules from Kamphans & al.
+            ### Part 2: Compound heterozygous. Use the 5 rules from Kamphans & al. ###
             
             # Rule 1: the child must be heterozygous. This is automatically fulfilled by now.
             # Rule 2: unaffected indivs must not be homozygous. In the trio case, this is covered by Rule 3 below.
             
-            try:
-                # Collect the 4 parental alleles in one list (for later use).
-                # If this fails, the variant is missing from one of the parents. If so: dont include.
-                parent_alleles = fatherAL[vdef] + motherAL[vdef]
-            except KeyError:
-                continue
-            
             for a1 in a:
                 if a1 == '0': 
                     continue
-                parentIBS = [pa == a1 for pa in parent_alleles] # a boolean vector of length 4.
+                # check if either parents are heterozygous for the allele
+                father_het = sum(fa == a1 for fa in father_alleles) == 1
+                mother_het = sum(mo == a1 for mo in mother_alleles) == 1 
                 
                 #Rule 3: the variant should be heterozygous in exactly one of the parents.
-                if sum(parentIBS) != 1: 
+                if not father_het != mother_het: 
                     continue
-                
-                # Which parent did the allele come from? 0 if paternal, 1 if maternal.
-                whichpar = parentIBS[2] + parentIBS[3]
                 
                 # Add v to the list of potential comphet variants of its associated gene(s).
                 for g in annGenes(v):
                     chGene[g].append(v)
-                    fromParent[g] |= {whichpar}
+                    fromParent[g] |= {mother_het} # for rule 5 below (add 0 if paternal, 1 if maternal)
                 
                 
         # Rule 4, at gene level: at least two variants in the same gene.
@@ -478,10 +506,12 @@ if __name__ == "__main__":
     reader = VariantFileReader.VariantFileReader()
     
     def test_comphetTrio():
-        test = "testfiles\\multiallelic_tests.vcf"; ch_fa_mo=[0,1,2]
-        vflist = reader.readVCFlike(test, sep="\t", chromCol="CHROM", posCol="POS", geneCol="Gene_INFO", splitAsInfo="INFO", keep00=1)
+        test = "C:\\Projects\\Filtus\\debug_ying.vcf"; ch_fa_mo=[0,1,2]
+        input = dict(sep="\t", chromCol="CHROM", posCol="POS", geneCol="CLINVAR__GENEINFO_INFO", formatCol="FORMAT", splitAsInfo="INFO")
+        vflist = reader.readVCFlike(test, keep00=1, **input)
         VFch, VFfa, VFmo = [vflist[i] for i in ch_fa_mo] 
         res = trioRecessiveFilter(VFch, VFfa, VFmo, "Recessive")
-        print res.variants
+        for v in res.variants:
+            print v
     
     test_comphetTrio()
