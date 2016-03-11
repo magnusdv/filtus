@@ -72,7 +72,7 @@ class Filter(object):
                 raise ValueError(errormessage + "At least one of 'regions_txt' and 'regions' must be None")
             else:
                 regions = FiltusWidgets.RegionFile.read(regions_txt)
-
+        
         self.restrict_genes_txt, self.exclude_genes_txt, self.restrict_var_txt, self.exclude_var_txt, self.regions_txt = \
                 restrict_genes_txt, exclude_genes_txt, restrict_var_txt, exclude_var_txt, regions_txt
         self.filtus = filtus
@@ -92,7 +92,8 @@ class Filter(object):
         
     def cleanup(self):
         self.columnfilters = self.prepareColumnfilters(self.columnfilters_original)
-
+        self.regionsChromdic = self.prepareRegions(self.regions)
+        
         exclvar, inclvar = self.exclude_variants_original, self.restrict_to_variants_original
         exclgen, inclgen = self.exclude_genes_original, self.restrict_to_genes_original
         controls, model = self.controls, self.model
@@ -114,6 +115,15 @@ class Filter(object):
             if model == 'Recessive' and self.benignPairs is True: # i.e. this is only included if 'benignPairs = True'
                 self.benignPairs = self.extractBenignPairs(controls)
 
+    def prepareRegions(self, regions):
+        if not regions: return None
+        regions.sort()
+        chromdic = collections.defaultdict(list)
+        for reg in regions:
+            chromdic[reg[0]].extend([float(reg[1]), float(reg[2])+1]) # +1 ensures endpoint in included in region, see filtusUtils.firstGreater().
+        return chromdic
+     
+     
     def __str__(self):
         txtlist = self.details()
         return '## ' + '\n## '.join(txtlist) if txtlist else "## No filters"
@@ -244,7 +254,7 @@ class Filter(object):
         restrict_to_variants = self.restrict_to_variants
         exclude_genes = self.exclude_genes
         restrict_to_genes = self.restrict_to_genes
-        regions = self.regions
+        regionsChromdic = self.regionsChromdic
         res = VF.variants[:]
 
         ### 0. if removeClosePairs - do this first
@@ -273,17 +283,22 @@ class Filter(object):
                 elif keep: continue
                 # else: This is dealt with in checks()
 
-        ### 4. regions: This can be slow when many regions are given ###
-        if regions is not None:
-            gt, lt = FiltusUtils.floatgt, FiltusUtils.floatlt
-            chrom, pos=VF.chromGetter, VF.posGetter
-            # res[:] = [v for v in res if any(chrom(v) == str(CHR) and gt(pos(v), START) and lt(pos(v), STOP) for CHR, START, STOP in regions)]
-            # faster:
-            chromReg = collections.defaultdict(list)
-            for reg in regions:
-                chromReg[reg[0]].append(reg[1:])
-            res[:] = [v for v in res if any(gt(pos(v), START) and lt(pos(v), STOP) for START, STOP in chromReg[chrom(v)])]
-
+        ### 4. regions: ###
+        if regionsChromdic is not None:
+            firstGreater = FiltusUtils.firstGreater
+            chrom, pos = VF.chromGetter, VF.posGetter
+            chrom_vars = collections.defaultdict(list)
+            for v in res:
+                chrom_vars[chrom(v)].append(v)
+            res = []
+            for chr in chrom_vars:
+                reg_startstops = regionsChromdic[chr]
+                vars = chrom_vars[chr]
+                vars.sort(key=lambda v: float(pos(v))) # possible to avoid doing float(pos()) twice??
+                interv = firstGreater((float(pos(v)) for v in vars), reg_startstops) # --> odd/even if inside/outside some region!
+                res.extend(v for v, intv in zip(vars, interv) if intv % 2 == 1)
+     
+     
         ### 5. exclude genes. Might be relatively slow because of annGenes. Haven't checked this though. ###
         if exclude_genes:
             annGenes = VF.annotatedGenes
@@ -514,4 +529,14 @@ if __name__ == "__main__":
         for v in res.variants:
             print v
     
-    test_comphetTrio()
+    def test_regionfilter():
+        #filt = Filter(regions_txt="C:/Projects/EXOME_ANALYSIS/Addison/Info/Design_Annotation_files/Target_Regions/SeqCap_EZ_Exome_v2_target_utenCHR.bed")
+        filt = Filter(regions_txt="1:3-6")
+        print filt
+        #input = dict(sep="\t", chromCol="chr", posCol="pos", geneCol="")
+        #vflist = reader.readVCFlike(test, keep00=0, **input)
+        vf = reader.readNonVCF("C:\\Users\\magnusdv\\Desktop\\kast.txt", sep="\t", chromCol="chr", posCol="pos", geneCol="", gtCol="")
+        vf2 = filt.apply(vf)
+        print vf.length, vf2.length
+            
+    test_regionfilter()

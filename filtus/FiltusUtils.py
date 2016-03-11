@@ -135,7 +135,35 @@ def region_intersection(*x):
             if not chrRes: break
         res.extend([[chr]+r for r in chrRes])
     return res
+   
+def firstGreater(y, vec):  
+    ''' For each number x in y, find the index of the first v in vec greater than x
+        
+        y: a sorted numerical iterable.
+        vec: any numerical iterable.
+
+        output: list of same length as y.
+        
+        Application: Interval membership. 
+            Suppose vec contains interval endpoints [start1, stop1, start2, stop2, ...], where start1 <= start2 <= ...
+            Then the elements of firstGreater(y, vec) are odd (even) for those members of y that are (are not) included in some interval.
+    '''
+    res = []
+    itery = iter(y)
+    try:
+        x = itery.next()
+        for i,v in enumerate(vec):
+            while x < v:
+                res.append(i)
+                x = itery.next()
+    except StopIteration:
+        return res
     
+    # remaining elements are beyond last endpoint.
+    L = len(vec)
+    res.extend(L for _ in itery) 
+    return res 
+   
 def inGeneList(entry, genelist):
     if entry in genelist:
         return True
