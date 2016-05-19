@@ -1658,7 +1658,7 @@ class RegionFile(FileBrowser):
         res = []
         if os.path.isfile(string):
             with open(string, 'rU') as regions:
-                regs = [line.split() for line in regions if not line.startswith('##')]
+                regs = [line.split() for line in regions if not line.startswith('#')]
             if all(x in regs[0] for x in ('CHR', 'POS1', 'POS2')): # reading plink .hom files!
                 get3 = itemgetter(regs[0].index('CHR'), regs[0].index('POS1'), regs[0].index('POS2'))
                 regs = [get3(r) for r in regs]
@@ -1668,8 +1668,11 @@ class RegionFile(FileBrowser):
             if all(len(r) == 1 for r in regs):
                 res = [_unpack(r[0]) for r in regs]
             else:
-                if 'chr' in regs[0][0].lower(): regs = regs[1:]
-                res = [(chr, float(start), float(stop)) for chr, start, stop in regs]
+                try:
+                    res = [(chr, float(start), float(stop)) for chr, start, stop in regs]
+                except:
+                    # skip first line
+                    res = [(chr, float(start), float(stop)) for chr, start, stop in regs[1:]]
         else:
             try:
                 res = [_unpack(r.strip()) for r in string.split(';')]

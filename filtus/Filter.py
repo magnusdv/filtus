@@ -1,6 +1,7 @@
 import FiltusUtils
 import FiltusWidgets
 import VariantFileReader
+import FiltusUtils
 import itertools
 import collections
 import time
@@ -291,7 +292,7 @@ class Filter(object):
             for v in res:
                 chrom_vars[chrom(v)].append(v)
             res = []
-            for chr in chrom_vars:
+            for chr in sorted(chrom_vars.keys(), key=FiltusUtils.chromInt):
                 reg_startstops = regionsChromdic[chr]
                 vars = chrom_vars[chr]
                 vars.sort(key=lambda v: float(pos(v))) # possible to avoid doing float(pos()) twice??

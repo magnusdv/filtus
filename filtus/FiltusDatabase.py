@@ -727,6 +727,9 @@ class VariantDatabase(DataContainer.ColumnData):
     
     @classmethod
     def readFileAndAdd(cls, filename, inFormat, inNS, outFormat, VFlist, sampleNames=None):
+        if not os.path.isfile(filename):
+            return VariantDatabase.buildFromSamples(VFlist=VFlist, outFormat=outFormat, sampleNames=sampleNames)
+            
         inFormat = formatInit(inFormat)
         outFormat = formatInit(outFormat)
         
