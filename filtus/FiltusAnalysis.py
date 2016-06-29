@@ -788,14 +788,16 @@ class DeNovoComputer(object):
                 print type(e).__name__, '%s: '%e
                 post_txt = '-'
             
-            ALTch = ADperc(AD(v), DNallele, default=0)
-            if minALTchild and ALTch < minALTchild: continue
-            ALTfa = ADperc(AD(v_fa), DNallele, default=0)
-            ALTmo = ADperc(AD(v_mo), DNallele, default=0)
-            if maxALTparent and (ALTfa > maxALTparent or ALTmo > maxALTparent): continue
+            if AD:
+                ALTch = ADperc(AD(v), DNallele, default=0)
+                if minALTchild and ALTch < minALTchild: continue
+                ALTfa = ADperc(AD(v_fa), DNallele, default=0)
+                ALTmo = ADperc(AD(v_mo), DNallele, default=0)
+                if maxALTparent and (ALTfa > maxALTparent or ALTmo > maxALTparent): continue
+                denovo.append((post_txt, '%.1f'% ALTch, '%.1f'% ALTfa, '%.1f'% ALTmo) + v)
+            else:
+                denovo.append((post_txt, '-', '-', '-') + v)
             
-            denovo.append((post_txt, '%.1f'% ALTch, '%.1f'% ALTfa, '%.1f'% ALTmo) + v)
-        
         heads = ['P(de novo|data)', '%ALT child', '%ALT father', '%ALT mother'] + VFch.columnNames
         
         analys_txt = "DE NOVO\n## Child: %d\n## Father: %d\n## Mother: %d\n" % tuple(i+1 for i in trioID)

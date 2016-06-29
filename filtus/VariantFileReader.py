@@ -152,6 +152,8 @@ class VariantFileReader(object):
         return h, variants
 
     def _splitGeneral(self, h, variants, splitCol, sep):
+        if not variants:
+            return h, variants
         if splitCol not in h:
             err = "Something is wrong: Column '%s' to be split, is not among the current column names:\n\n%s" %(splitCol, ', '.join(h))
             raise RuntimeError(err)

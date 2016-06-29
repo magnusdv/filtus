@@ -2266,6 +2266,7 @@ class DeNovo_GUI(Pmw.Dialog):
         VF = self.filtus.checkLoadedSamples(select="all", VF=True, minimum=3)[0]
         self._altFreqMenu.setItems([''] + VF.columnNames)
         
+        
     def _readInput(self):
         loadedVFs = self.filtus.filteredFiles
         loadedFilenames = [VF.longName for VF in loadedVFs]
@@ -2291,6 +2292,11 @@ class DeNovo_GUI(Pmw.Dialog):
         minALTchild = float(self._minALTchild_entry.getvalue()) if self._minALTchild_entry.getvalue() else None 
         maxALTparent = float(self._maxALTparent_entry.getvalue()) if self._maxALTparent_entry.getvalue() else None 
         
+        if minALTchild is not None or maxALTparent is not None:
+            for vf, s in zip([VFch, VFfa, VFmo], ['child', 'father', 'mother']):
+                if not 'AD' in vf.columnNames:
+                    raise RuntimeError("AD column not found in the %s.\n"%s + "ALT percentage filters cannot be used.")
+                    
         altFreqCol = self._altFreqMenu.getvalue()
         def_freq = self._def_freq_entry.getvalue()
         if not def_freq or not 0 < float(def_freq) < 1: 
