@@ -1,7 +1,7 @@
 import FiltusUtils
 import FiltusWidgets
 import VariantFileReader
-import FiltusUtils
+
 import itertools
 import collections
 import time
@@ -370,6 +370,7 @@ def trioRecessiveFilter(VFch, VFfa, VFmo, model):
     # Local function referances for speed
     vardef = VFch.chromPosRefAlt
     annGenes = VFch.annotatedGenes
+    XminusPAR = FiltusUtils.XminusPAR
     
     # Utility function for extracting the genotype (as a tuple (a0, a1)) of a single variant
     # Numerical codes (as in GT field) are used: Important that all family members are in the same VCF file.
@@ -382,7 +383,7 @@ def trioRecessiveFilter(VFch, VFfa, VFmo, model):
     # The set of all variants where at least one parent is homozygous. Entries: ((chrom, pos, ref, alt), A) where A is the observed homozygous allele.
     parHOM = {(vdef,a[0]) for vdef, a in itertools.chain(fatherAL.iteritems(), motherAL.iteritems()) if a[0]==a[1]!='.'}
     
-    ### Loop through the variants of the child and check compatibility with recessive inheritance
+    ### Loop through the variants of the child and check compatibility with AR or XR inheritance
     if model == 'Recessive homozygous':
         # homAllele is a function which takes a single variant as input and returns A if homozygous A/A, or -1 if heterozygous.
         homAllele = VFch.homAllele()
@@ -408,10 +409,18 @@ def trioRecessiveFilter(VFch, VFfa, VFmo, model):
             except KeyError:
                 continue
             
-            # If both parents are heterozygous, include in results
-            father_het = sum(fa == a0 for fa in father_alleles) == 1
-            mother_het = sum(mo == a0 for mo in mother_alleles) == 1  
-            if father_het and mother_het:
+            # Check first if mother is not heterozygous (this is a requirement for both AR and XR inheritance)
+            if not sum(mo == a0 for mo in mother_alleles):
+                continue
+            
+            # Now check the number of copies carried by the father
+            father_num = sum(fa == a0 for fa in father_alleles)
+            if father_num == 0 and XminusPAR(vdef[:2]):
+                # X-linked hemizygosity: Include if child homozyous & mother heterozygous & father is non-carrier
+                # NB: Only "correct" XR for male child. If child is female, this situation requires a de novo event.
+                res.append(v)
+            elif father_num == 1:             
+                # Autosomal homozygosity: Include if both parents are heterozygous
                 res.append(v)
         
                 
@@ -444,15 +453,29 @@ def trioRecessiveFilter(VFch, VFfa, VFmo, model):
                 
             ### Part 1: Homozygous ###
             
-            # If homozygous in child: store if heterozygous in both parents. In any case, continue to next variant.
+            # If homozygous in child: store if heterozygous in both parents (AR) or heteroz in mother and missing in father (XR).
+            # In any case, continue to next variant.
             if a[0] == a[1]:
                 a0 = a[0]
                 if (vdef, a0) in parHOM: #check if homoz in either parent (this step is for speed, could be skipped)
                     continue
-                father_het = sum(fa == a0 for fa in father_alleles) == 1
-                mother_het = sum(mo == a0 for mo in mother_alleles) == 1  
-                if father_het and mother_het:
-                    homoz.append(v)
+                
+                # If mother is not heterozygous, continue (this is a requirement for both AR and XR inheritance)
+                if not sum(mo == a0 for mo in mother_alleles) == 1:
+                    continue
+            
+                # Now check the number of copies carried by the father
+                father_num = sum(fa == a0 for fa in father_alleles)
+                if XminusPAR(vdef[:2]):
+                    # X-linked hemizygosity: Include if mother heterozygous & father is non-carrier
+                    # NB: Only "correct" XR for male child. If child is female, this situation requires a de novo event.
+                    if father_num == 0:
+                        homoz.append(v)
+                else:
+                    # Autosomal homozygosity: Include if both parents are heterozygous
+                    if father_num == 1:             
+                        homoz.append(v)
+                    
                 continue
         
             ### Part 2: Compound heterozygous. Use the 5 rules from Kamphans & al. ###
@@ -540,4 +563,4 @@ if __name__ == "__main__":
         vf2 = filt.apply(vf)
         print vf.length, vf2.length
             
-    test_regionfilter()
+    test_comphetTrio()
