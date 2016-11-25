@@ -486,19 +486,19 @@ def trioRecessiveFilter(VFch, VFfa, VFmo, model):
             for a1 in a:
                 if a1 == '0': 
                     continue
-                # check if either parents are heterozygous for the allele
-                father_het = sum(fa == a1 for fa in father_alleles) == 1
-                mother_het = sum(mo == a1 for mo in mother_alleles) == 1 
+                
+                # count allele copies in each parent
+                father_num = sum(fa == a1 for fa in father_alleles)
+                mother_num = sum(mo == a1 for mo in mother_alleles) 
                 
                 #Rule 3: the variant should be heterozygous in exactly one of the parents.
-                if not father_het != mother_het: 
+                if not father_num + mother_num == 1:
                     continue
                 
                 # Add v to the list of potential comphet variants of its associated gene(s).
                 for g in annGenes(v):
                     chGene[g].append(v)
-                    fromParent[g] |= {mother_het} # for rule 5 below (add 0 if paternal, 1 if maternal)
-                
+                    fromParent[g] |= {mother_num} # for rule 5 below (add 0 if paternal, 1 if maternal)
                 
         # Rule 4, at gene level: at least two variants in the same gene.
         # Rule 5, at gene level: at least one variant from each parent.
@@ -553,6 +553,16 @@ if __name__ == "__main__":
         for v in res.variants:
             print v
     
+    def test_comphetTrio2():
+        test = "C:\\Projects\\Filtus\\filtus.testRecessive.vcf"; ch_fa_mo=[0,2,1]
+        input = dict(sep="\t", chromCol="CHROM", posCol="POS", geneCol="GENE_SYMBOL_INFO", formatCol="FORMAT", splitAsInfo="INFO")
+        vflist = reader.readVCFlike(test, keep00=1, **input)
+        VFch, VFfa, VFmo = [vflist[i] for i in ch_fa_mo] 
+        res = trioRecessiveFilter(VFch, VFfa, VFmo, "Recessive")
+        pos = [v[1] for v in res.variants]
+        if not pos == ['22005167', '22017410']: 
+            print "Error:\n", pos, str([22005167, 22017410])
+            
     def test_regionfilter():
         #filt = Filter(regions_txt="C:/Projects/EXOME_ANALYSIS/Addison/Info/Design_Annotation_files/Target_Regions/SeqCap_EZ_Exome_v2_target_utenCHR.bed")
         filt = Filter(regions_txt="1:3-6")
@@ -564,3 +574,4 @@ if __name__ == "__main__":
         print vf.length, vf2.length
             
     test_comphetTrio()
+    test_comphetTrio2()
