@@ -594,22 +594,41 @@ class DeNovoComputer(object):
         return p
     
  
-    def _ADperc(self, ADfield, alleleNum, default=0.0):
+    def _ADperc(self, ADfield, alleleNum=None, default=0.0):
         '''Input: AD field (string), alleleNum (integer or list of integers). 
         Output: Percentage of reads with the specified allele numbers.'''
         try: 
-            reads = map(int, ADfield.split(','))
-            if isinstance(alleleNum, list):
-                return sum(float(reads[num]) for num in alleleNum)/sum(reads)*100
+            reads = map(float, ADfield.split(','))
+            s = sum(reads)
+            if alleleNum is None:
+                return [r/s*100 for r in reads]
+            elif isinstance(alleleNum, list):
+                return sum(reads[num] for num in alleleNum)/s*100
             else:
-                return float(reads[alleleNum])/sum(reads)*100
+                return reads[alleleNum]/s*100
         except (ValueError, ZeroDivisionError):
             return default
         except Exception as e:
             print e
             return default
             
-    
+    def DNallelesAD(self, ADfa, ADmo, ADch, maxALTparent, minALTchild):
+        '''Use AD fields to identify alleles satisfying the cutoffs
+        Returns (alleleNum, ALTp_fa, ADp_mo, ADp_ch)'''
+        ADp_fa = self._ADperc(ADfa, default=False)
+        if not ADp_fa or all(fa > maxALTparent for fa in ADp_fa): return []
+        ADp_mo = self._ADperc(ADmo)
+        if not ADp_mo or all(mo > maxALTparent for mo in ADp_mo): return []
+        ADp_ch = self._ADperc(ADch)
+        print map(int, ADp_ch), map(int, ADp_fa), map(int, ADp_mo)
+        if not ADp_ch or not len(ADp_ch)==len(ADp_fa)==len(ADp_mo): return []
+        
+        denovo = [(i,fa,mo,ch) for i,(fa,mo,ch) in enumerate(zip(ADp_fa, ADp_mo, ADp_ch)) if i>0 and ch >= minALTchild and fa <= maxALTparent and mo <= maxALTparent]
+        if not denovo: 
+            return []
+        
+        return denovo[0]
+        
     def denovoModeMulti(self, al_fa, al_mo, al_ch, X, boy):
         '''Check if genotype combo is de novo and return mode (PL index triple) and DN allele'''
 
@@ -681,7 +700,8 @@ class DeNovoComputer(object):
     def fixPL(self, PLf, PLm, PLc, X, boy):
         if X: 
             del PLf[1]
-            if boy: del PLc[1]            
+            if boy: 
+                del PLc[1]            
         
     def analyze(self, VFch, VFfa, VFmo, trioID, mut, defaultFreq, boygirl, altFreqCol=None, MAFcolumns=None, threshold=None, minALTchild=None, maxALTparent=None):
         #### Checking input data
@@ -691,21 +711,27 @@ class DeNovoComputer(object):
         if maxALTparent is not None and not 0 <= maxALTparent <= 100: raise ValueError("Maximum parent ALT percentage must be between 0 and 100")
         
         #### Setup
+        useGT = minALTchild is None and maxALTparent is None
+        
         vardef = VFch.chromPosRefAlt 
         if vardef is None: 
             raise ValueError("The input file format is not VCF-like.") 
         
         GT, AD, PL = [VFch.columnGetter(x) for x in ('GT', 'AD', 'PL')]
-        if GT is None or PL is None:
-            raise ValueError("Required columns 'GT' and/or 'PL' missing from sample %s" % VFch.longname)
+        if PL is None:
+            raise ValueError("Required column 'PL' missing from sample %s." % VFch.longname)
+        if useGT and GT is None:
+            raise ValueError("Required column 'GT' missing from sample %s." % VFch.longname)
+        if not useGT and AD is None:
+            raise ValueError("Required column 'AD' missing from sample %s." % VFch.longname)    
         
         freq = AlleleFreq(VFch, defaultFreq=defaultFreq, altFreqCol=altFreqCol, MAFcolumns=MAFcolumns, minmax=(0.001, 0.999))
         
+        # Local definitions for speed
         item02 = itemgetter(0,2) # used to extract alleles from genotype, e.g. '0/1' -> ('0', '1')
         def _alleles(v): 
             return tuple(sorted(item02(GT(v))))
         
-        # Local definitions for speed
         denovoMode2 = self._denovoMode2
         denovoModeMulti = self.denovoModeMulti
         ADperc = self._ADperc
@@ -724,47 +750,78 @@ class DeNovoComputer(object):
         ##### Main bulk: Loop through all variants in child
         denovo = []
         for v in VFch.variants:
-            
-            ### 1. test: Child = REF/REF --> benign.
-            al_ch = _alleles(v)
-            if al_ch == ('0','0'):
-                continue
-            
-            vdef = vardef(v)
-            if vdef[0] == 'Y': continue
-            X = XminusPAR(vdef)
-
-            ### 2. test: Missing patrental data --> benign
             try:
-                v_fa = fa00[vdef]
-                v_mo = mo00[vdef]
-            except KeyError:
+                if useGT:
+                    ### 1. test: Child = REF/REF --> benign.
+                    al_ch = _alleles(v)
+                    if al_ch == ('0','0'): continue
+                    
+                    vdef = vardef(v)
+                    if vdef[0] == 'Y': continue
+                    
+                    ### 2. test: Missing parental data --> benign
+                    v_fa = fa00[vdef]
+                    v_mo = mo00[vdef]
+                    al_fa, al_mo = _alleles(v_fa), _alleles(v_mo)
+                    
+                    ### 3. test: Child = either parent --> benign
+                    if al_ch in [al_fa, al_mo]: continue
+                    
+                    X = XminusPAR(vdef)
+                    lenA = vdef[3].count(',') + 2
+                    
+                    ### 4. test: Check explicitly if genotype combo is de novo
+                    if lenA > 2: # multiallelic
+                        multitest = denovoModeMulti(al_fa, al_mo, al_ch, X=X, boy=boy)
+                        if not multitest: continue
+                        denovoMode, DNallele = multitest
+                    else:
+                        tag = 'A' if not X else 'Xboy' if boy else 'Xgirl'
+                        denovoMode = denovoMode2[tag].get((al_fa, al_mo, al_ch), False)
+                        if not denovoMode: continue 
+                        DNallele = 1
+                
+                    if AD:
+                        ALTch = ADperc(AD(v), alleleNum=DNallele)
+                        ALTfa = ADperc(AD(v_fa), alleleNum=DNallele)
+                        ALTmo = ADperc(AD(v_mo), alleleNum=DNallele)
+                        ALT_txt = tuple('%.1f'% a for a in (ALTch, ALTfa, ALTmo))
+                    else:
+                        ALT_txt = ('-', '-', '-')
+                else:
+                    # Using AD data and minALTchild/maxALTparent 
+                    if minALTchild is None: minALTchild=0
+                    if maxALTparent is None: maxALTparent=100
+                    
+                    vdef = vardef(v)
+                    if vdef[0] == 'Y': continue
+                    
+                    v_fa = fa00[vdef]
+                    v_mo = mo00[vdef]
+                    lenA = vdef[3].count(',') + 2
+                    
+                    if lenA == 2:
+                        # In this case, check only ALT allele (assuming REF is benign)
+                        ALTch = ADperc(AD(v), alleleNum=1, default=0)
+                        if ALTch < minALTchild: continue
+                        ALTfa = ADperc(AD(v_fa), alleleNum=1, default=0)
+                        if ALTfa > maxALTparent: continue
+                        ALTmo = ADperc(AD(v_mo), alleleNum=1, default=0)
+                        if ALTmo > maxALTparent: continue
+                        denovoMode = (0,0,1)
+                    else:
+                        dn_dat = self.DNallelesAD(AD(v_fa), AD(v_mo), AD(v), maxALTparent, minALTchild)
+                        if len(dn_dat)==0: continue
+                        DNallele, ALTfa, ALTmo, ALTch
+                        denovoMode = (0,0,DNallele) if X and boy else (0,0,DNallele*(DNallele+1)/2)
+                    
+                    ALT_txt = tuple('%.1f'% a for a in (ALTch, ALTfa, ALTmo))
+            except Exception:
                 continue
             
+            ### If we've gotten this far, we have a de novo combo, and proceed to compute posterior prob.
             try:    
-                al_fa, al_mo = _alleles(v_fa), _alleles(v_mo)
-                
-                ### 3. test: Child = either parent --> benign
-                if al_ch in [al_fa, al_mo]:
-                    continue
-        
-                ### 4. test: Check explicitly if genotype combo is de novo
-                multi = ',' in vdef[3]
-                if multi:
-                    multitest = denovoModeMulti(al_fa, al_mo, al_ch, X=X, boy=boy)
-                    if not multitest: 
-                        continue
-                    denovoMode, DNallele = multitest
-                    lenA = vdef[3].count(',') + 2
-                else:
-                    tag = 'A' if not X else 'Xboy' if boy else 'Xgirl'
-                    denovoMode = denovoMode2[tag].get((al_fa, al_mo, al_ch), False)
-                    if not denovoMode:
-                        continue 
-                    DNallele = 1
-                    lenA = 2
-                
-                ### If we've gotten this far, we have a de novo combo, and proceed to compute posterior prob.
+                X = XminusPAR(vdef)
                 PLf = [int(a) for a in PL(v_fa).split(',')]
                 PLm = [int(a) for a in PL(v_mo).split(',')]
                 PLc = [int(a) for a in PL(v).split(',')]
@@ -788,15 +845,7 @@ class DeNovoComputer(object):
                 print type(e).__name__, '%s: '%e
                 post_txt = '-'
             
-            if AD:
-                ALTch = ADperc(AD(v), DNallele, default=0)
-                if minALTchild and ALTch < minALTchild: continue
-                ALTfa = ADperc(AD(v_fa), DNallele, default=0)
-                ALTmo = ADperc(AD(v_mo), DNallele, default=0)
-                if maxALTparent and (ALTfa > maxALTparent or ALTmo > maxALTparent): continue
-                denovo.append((post_txt, '%.1f'% ALTch, '%.1f'% ALTfa, '%.1f'% ALTmo) + v)
-            else:
-                denovo.append((post_txt, '-', '-', '-') + v)
+            denovo.append((post_txt, ) + ALT_txt + v)
             
         heads = ['P(de novo|data)', '%ALT child', '%ALT father', '%ALT mother'] + VFch.columnNames
         
@@ -1123,17 +1172,20 @@ def _printVF(VF, truncate=10):
    
    
 if __name__ == "__main__":
-    
+    import time
     import VariantFileReader
     reader = VariantFileReader.VariantFileReader()
     
     def test_denovo():
-        test = "testfiles\\trioHG002_22X.vcf"; frqCol="1000g2014oct_all"; ch_fa_mo=[0,1,2]
-        vflist = reader.readVCFlike(test, sep="\t", chromCol="VCF_CHR", posCol="VCF_POS", geneCol="Gene.refGene", formatCol="VCF_FORMAT",splitAsInfo="", keep00=1)
-        VFch, VFfa, VFmo = [vflist[i] for i in ch_fa_mo] 
         dn = DeNovoComputer()
-        res1 = dn.analyze(VFch, VFfa, VFmo, boygirl="Boy", trioID=ch_fa_mo, mut=1e-8, defaultFreq=.1, altFreqCol=frqCol, minALTchild=None, maxALTparent=None)
+        
+        test = "testfiles\\trioHG002_22X.vcf"; frqCol="1000g2014oct_all"; ch_fa_mo=[0,1,2]
+        vflist = reader.readVCFlike(test, sep="\t", chromCol="VCF_CHR", posCol="VCF_POS", geneCol="Gene.refGene", formatCol="VCF_FORMAT", splitAsInfo="", keep00=1)
+        VFch, VFfa, VFmo = [vflist[i] for i in ch_fa_mo] 
+        res1 = dn.analyze(VFch, VFfa, VFmo, boygirl="boy", trioID=ch_fa_mo, mut=1e-8, defaultFreq=.1, threshold=.00001, altFreqCol=frqCol, minALTchild=None, maxALTparent=None)
         _printVF(res1)
+        res2 = dn.analyze(VFch, VFfa, VFmo, boygirl="Boy", trioID=ch_fa_mo, mut=1e-8, defaultFreq=.1, altFreqCol=frqCol, minALTchild=60, maxALTparent=40)
+        _printVF(res2)
         
     test_denovo()
     
