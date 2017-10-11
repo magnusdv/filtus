@@ -32,9 +32,13 @@ class InputDialog(object):
         self._FORMATheaders = []
         self._sampleNames = []
         self.splitFormat = False
+        self.hasCSQ = False
+        self._CSQheaders = []
+        self.splitCsq = False
         self.keep00 = False
         self.split_general = False
         self.splitFormatVar = Tkinter.IntVar(self.parent)
+        self.splitCsqVar = Tkinter.IntVar(self.parent)
         self.keep00Var = Tkinter.IntVar(self.parent)
         
         self.prefilter = None
@@ -125,8 +129,13 @@ class InputDialog(object):
         self.splitFormatButt = Tkinter.Checkbutton(split_interior, variable=self.splitFormatVar, text="  Split FORMAT/genotypes",
             command=self._splitFORMAT_update)
         self.splitFormatButt.grid(sticky='w', padx=(10,5), pady=2)
+        
         self.infoColMenu = OM(split_interior, label_text='Split as "INFO":', command=self._splitINFO_update, **OM_OPTIONS)
         self.infoColMenu.grid(**grid_nw)
+        
+        self.splitCsqButt = Tkinter.Checkbutton(split_interior, variable=self.splitCsqVar, text="and split CSQ",
+            command=self._splitCsq_update)
+        self.splitCsqButt.grid(row=1, column=1, **grid_nw)
         
         self.splitcol1Menu = OM(split_interior, label_text="Split column:", **OM_OPTIONS)
         self.splitcol1_sep = Pmw.EntryField(split_interior, label_text = "by separator", entry_width=4, **pmw_OPTIONS)
@@ -190,7 +199,7 @@ class InputDialog(object):
             
             self.filtus.busy()
             common_params = dict(filename=filename, sep=self.sep, chromCol=self.chromCol, posCol=self.posCol, geneCol=self.geneCol, 
-                                splitAsInfo=self.infoCol, split_general=self.split_general, prefilter=self.prefilter)
+                                splitAsInfo=self.infoCol, splitCsq=self.splitCsq, split_general=self.split_general, prefilter=self.prefilter)
             
             if self.vcf:
                 VF = self.reader.readVCFlike(formatCol=self.formatCol, splitFormat=self.splitFormat, keep00=self.keep00, **common_params)
@@ -203,6 +212,7 @@ class InputDialog(object):
             FiltusUtils.warningMessage(e)
             return self.read(filename, guess = False, prompt=True)
         except Exception as e:
+            raise
             self.filtus.notbusy()
             typ = type(e).__name__
             FiltusUtils.warningMessage("An error occured while reading this file:\n%s\n\n%s: %s\n\nPlease try again or skip file." %(filename, typ, e))
@@ -220,8 +230,9 @@ class InputDialog(object):
     def _guessAndPrepare(self, filename, kwargs):
         self.currentfile = filename
         self.fileLabel.configure(text=FiltusUtils.wrapFilename(filename, joinsep='\n     '))
-        headerline, firstline = self._getFirstLines(filename)
+        preamble, headerline, firstline = self._getFirstLines(filename)
         self.__dict__.update(kwargs)
+        
         sep = self.sep
         if sep is None or sep not in headerline:
             sep = next((char for char in ['\t', ',', ';', ' '] if char in headerline and char in firstline), '\t')
@@ -252,7 +263,15 @@ class InputDialog(object):
         if 'splitAsInfo' in kwargs: 
             self.infoColMenu.setAndCheck(kwargs['splitAsInfo'])
             self. _splitINFO_update()
-            
+        
+        # If VEP CSQ info present: Store headers
+        self.hasCSQ = False
+        for line in preamble:
+            if 'ID=CSQ,' in line:
+                self.hasCSQ = True
+                self._CSQheaders = line.split("Format: ")[1].strip().strip('">').split("|")
+                break
+                
         if 'geneCol' in kwargs: self.geneColMenu.setAndCheck(kwargs['geneCol'])
         elif _doGuess('geneCol'):
             geneCol = _matchHeader(['gene', 'gene.refgene', 'gene symbol'])
@@ -299,11 +318,13 @@ class InputDialog(object):
             
     def _getFirstLines(self, filename, n=1):
         self.skiplines = 0
+        preamble = []
         firstlines = []
         self.commentChar = comment = self.commentEntry.getvalue().strip()
         with open(filename, 'rU') as ifile:
             for line in ifile:
                 if comment and line.startswith(comment): 
+                    preamble.append(line)
                     self.skiplines += 1
                     continue
                 firstlines.append(line)
@@ -316,14 +337,14 @@ class InputDialog(object):
             first = firstlines[1] if len(firstlines) > 1 else ''
         else:
             first = firstlines[1:]
-        return headerline, first
+        return preamble, headerline, first
  
  
     ################### Callback functions
     
-    def _readAndSetHeaders(self, sepvalue=None):#, headerline=None, firstline=None):
+    def _readAndSetHeaders(self, sepvalue=None):
         '''Callback for both self.sepInputOM and self.commentEntry'''
-        headerline, firstline = self._getFirstLines(self.currentfile, n=100)
+        preamble, headerline, firstline = self._getFirstLines(self.currentfile, n=100)
         if sepvalue: 
             self.sep = self._sepDic[sepvalue]
         self.sepInputOM.setColor(test=self.sep in headerline)
@@ -352,33 +373,70 @@ class InputDialog(object):
             if self.infoColMenu.inconsistent:
                return
             column = self.infoColMenu.getvalue()
-            
+        
         self.infoColMenu.setColor(True)
         h = self.currentHeaders[:]
         
-        def unsplit():
-            if self._INFOheaders:
-                ind = h.index(self._INFOheaders[0])
-                h[ind:(ind + len(self._INFOheaders))] = [self.infoCol]
-            self._INFOheaders = []
-            self.infoCol = ''
+        ### Always start by unsplitting everything:
+        # If CSQ is split: unsplit this first
+        splitCsq = self.hasCSQ and self.splitCsqVar.get()
+        if splitCsq:
+            self.splitCsqVar.set(0)
+            self._splitCsq_update()
+            h[:] = self.currentHeaders[:]
+
+        # Unsplit INFO fields
+        if self._INFOheaders:
+            ind = h.index(self._INFOheaders[0])
+            h[ind:(ind + len(self._INFOheaders))] = [self.infoCol]
+        self._INFOheaders = []
+        self.infoCol = ''
+           
+        ### If empty selection: Reset and return
+        if column == "": 
+            self._updateColnameMenus(h)  
+            self.splitCsqButt.configure(state="disabled")
+            return
         
-        if column != "": 
-            first_infos = [v[self.originalHeaders.index(column)] for v in self.firstvariants]
-            _INFOheaders = sorted(set(s.split('=')[0] + '_INFO' for info in first_infos for s in info.split(';') if '=' in s))
-            if not _INFOheaders:
-                self.infoColMenu.setColor(False)
-                FiltusUtils.warningMessage("I don't recognise %s as an INFO column"%column)
-                return
-            unsplit() # undo possible previous split
-            ind = h.index(column)
-            h[ind:(ind + 1)] = _INFOheaders
-            self._INFOheaders = _INFOheaders
-            self.infoCol = column
+        ### Otherwise: split selected column as INFO (if possible)
+        first_infos = [v[self.originalHeaders.index(column)] for v in self.firstvariants]
+        _INFOheaders = sorted(set(s.split('=')[0] + '_INFO' for info in first_infos for s in info.split(';') if '=' in s))
+        
+        if not _INFOheaders:
+            self.infoColMenu.setColor(False)
+            self.splitCsqButt.configure(state="disabled")
+            self._updateColnameMenus(h)
+            FiltusUtils.warningMessage("I don't recognise %s as an INFO column"%column)
+            return
+        
+        ind = h.index(column)
+        h[ind:(ind + 1)] = _INFOheaders
+        self._updateColnameMenus(h)   
+        
+        if self.hasCSQ and "CSQ_INFO" in _INFOheaders:
+            self.splitCsqButt.configure(state="normal")
+            if splitCsq:
+                self.splitCsqVar.set(1)
+                self._splitCsq_update()
+        
+        self._INFOheaders = _INFOheaders
+        self.infoCol = column
+        
+        
+    def _splitCsq_update(self, reset=False): 
+        '''callback for the splitCsq checkbox'''
+        h = self.currentHeaders[:]
+        csq_heads = self._CSQheaders
+        split = self.splitCsqVar.get()
+        if split:
+            ind = h.index("CSQ_INFO")
+            h[ind:(ind + 1)] = csq_heads
         else:
-            unsplit()
-        self._updateColnameMenus(h)    
+            if all(csq in h for csq in csq_heads): # extra precaution
+                ind = h.index(csq_heads[0])
+                h[ind:(ind + len(csq_heads))] = ['CSQ_INFO']
         
+        self._updateColnameMenus(h)    
         
     def _splitFORMAT_update(self, reset=False): 
         '''callback for the splitFormat checkbox'''
@@ -415,7 +473,7 @@ class InputDialog(object):
             unsplit()
             
         self._updateColnameMenus(h)
-        
+    
     def _updateColnameMenus(self, headers, all=False):
         '''Update various option menus in the dialog. If (all) include those unaffected by splits.'''
         self.currentHeaders = headers[:]
@@ -458,6 +516,7 @@ class InputDialog(object):
             setattr(self, key, getattr(self, key+'Menu').getvalue())
         
         self.splitFormat = self.splitFormatVar.get()
+        self.splitCsq = self.splitCsqVar.get()
         self.keep00 = self.keep00Var.get()
         self.split_general = [(self.splitcol1, self.splitcol1_sep.getvalue()), (self.splitcol2, self.splitcol2_sep.getvalue())]
         self.split_general = [(x,y) for x,y in self.split_general if x]

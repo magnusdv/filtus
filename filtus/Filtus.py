@@ -5,7 +5,7 @@
 #----------------------------------------------------------------
 
 PROGRAM_NAME = "FILTUS"
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 import gc
 import sys

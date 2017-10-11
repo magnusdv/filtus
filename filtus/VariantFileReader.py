@@ -46,7 +46,7 @@ class VariantFileReader(object):
         return DataContainer.VariantData(filename=filename, columnNames=headers, variants=variants, **params)
 
     def readVCFlike(self, filename, sep, chromCol, posCol, geneCol, keep00=0, split_general=[],
-                    splitAsInfo="", formatCol="FORMAT", splitFormat=1, commentChar="##", prefilter=None):
+                    splitAsInfo="", splitCsq=0, formatCol="FORMAT", splitFormat=1, commentChar="##", prefilter=None):
         preambleLines = []
         with open(filename, "rU") as ifile:
             line = ifile.next()
@@ -57,7 +57,9 @@ class VariantFileReader(object):
             if prefilter is not None: 
                 ifile = self._applyPrefilter(ifile, prefilter)
             data = [row for row in csv.reader(ifile, delimiter = sep, skipinitialspace = False, strict=True)] # saving time (?) with skip.. = False
-        descriptions = self._parseDescriptions(preambleLines)
+        #descriptions = self._parseDescriptions(preambleLines)
+        colDescriptions = self._parseColumnDescriptions(preambleLines)
+        descriptions = self._prettyDescriptions(colDescriptions)
         
         if len(data) == 0: 
             raise RuntimeError("No variants in file")
@@ -66,10 +68,14 @@ class VariantFileReader(object):
             headers = self._fixAnnovarOtherinfo(headers, firstvar=data[0])
         if headers[0] == '#CHROM': ### VCF tweak
             headers[0] = 'CHROM'
+        
         if splitAsInfo:
             infoInd = headers.index(splitAsInfo)
-            headers[:], data[:] = self._splitINFO(headers, data, infoInd)
-        
+            try:
+                headers[:], data[:] = self._splitINFO_fast(headers, data, infoInd, colDescriptions, splitCsq=splitCsq)
+            except KeyError:
+                headers[:], data[:] = self._splitINFO_slow(headers, data, infoInd)
+            
         split_general_common = [(x,y) for x,y in split_general if x in headers]
         split_general_special = [(x,y) for x,y in split_general if x not in headers]
         
@@ -142,8 +148,7 @@ class VariantFileReader(object):
         h[formatIndex:] = formatHeads
         return h, variants
 
-
-    def _splitINFO(self, h, variants, infoInd):
+    def _splitINFO_slow(self, h, variants, infoInd):
         info = [dict(s.split('=', 1) if '=' in s else [s,'1'] for s in r[infoInd].split(';')) for r in variants]
         all_tagheads = sorted(set(tag for dic in info for tag in dic))
         h[infoInd:(infoInd + 1)] = [tag + '_INFO' for tag in all_tagheads]
@@ -151,6 +156,31 @@ class VariantFileReader(object):
             x[infoInd:(infoInd + 1)] = [infodic.get(tag, '') for tag in all_tagheads]
         return h, variants
 
+    def _splitINFO_fast(self, h, variants, infoInd, colDescriptions, splitCsq):
+        infoDesc = colDescriptions['INFO']
+        all_infotags = sorted(infoDesc)
+        h[infoInd:(infoInd + 1)] = [tag + '_INFO' for tag in all_infotags]
+        
+        if splitCsq:
+            # index of 'CSQ' in the sorted list of info tags (used for extraction in each variant line)
+            csqInInfo = all_infotags.index('CSQ')
+            
+            # fix headers
+            csq_heads = infoDesc['CSQ'].split("Format: ")[1].split("|")
+            csqInd = h.index('CSQ_INFO')
+            h[csqInd:(csqInd + 1)] = csq_heads
+            
+        for v in variants:
+            info_dict = dict(s.split('=', 1) if '=' in s else [s,'1'] for s in v[infoInd].split(';'))
+            info_values = [info_dict.get(tag, '') for tag in all_infotags]
+            if splitCsq:
+                csq1 = info_values[csqInInfo].split(',')[0] # first consequence only
+                info_values[csqInInfo:(csqInInfo + 1)] = csq1.split('|')
+            v[infoInd:(infoInd + 1)] = info_values
+        
+        return h, variants
+
+        
     def _splitGeneral(self, h, variants, splitCol, sep):
         if not variants:
             return h, variants
@@ -180,31 +210,48 @@ class VariantFileReader(object):
             headers[-1:] = ['zygosity', 'CHROM', 'POS', 'rsID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', '<sample>'] 
         return headers
         
-    def _parseDescriptions(self, lines):
-        '''Parses the intro part of a VCF file. Returns a dict with elements like: {(FORMAT, GT): "Description"}.'''
-        
+    def _parseColumnDescriptions(self, lines):
+        '''
+        Parses the column description lines in the preamble of a VCF file. 
+        Returns a dict of dicts, e.g. {'FORMAT': {'GT': "Genotype", 'AD': 'Allele depth'}}
+        '''
+        column_descriptions = dict()
         PATTERN = re.compile(r'''((?:[^,"']|"[^"]*"|'[^']*')+)''')
-        def process(line):
-            col = line[2:line.index('=')]
-            start, stop = line.index('<')+1, line.rindex('>')
-            dat = dict([b.split('=', 1) for b in PATTERN.split(line[start:stop])[1::2]])
-            return ((col, dat['ID']), dat['Description'])
-
-        descr = [process(line) for line in lines if all(x in line for x in ['=<', '>', 'ID', 'Description'])]
-        if not descr:
-            return None
-        descriptions = {key[1] : val for key, val in descr if key[0] == "FORMAT" or key[0] == "INFO" }
-        descriptions.update({key[1]+'_INFO' : val for key, val in descr if key[0] == "INFO"})
-        filters = [x for x in descr if x[0][0] == "FILTER"]
-        if filters:
-            max_width = max(len(x[0][1]) for x in filters)
-            descriptions['FILTER'] = '\n'.join('%-*s %s' %(max_width, x[0][1] + ':', x[1]) for x in filters)
+        for line in lines:
+            try:
+                col = line[2:line.index('=')]
+                start, stop = line.index('<')+1, line.rindex('>')
+                tagvalues = dict([b.split('=', 1) for b in PATTERN.split(line[start:stop])[1::2]])
+                id, descr = tagvalues['ID'], tagvalues['Description']
+                if not col in column_descriptions:
+                    column_descriptions[col] = dict()
+                column_descriptions[col][id] = descr
+            except:
+                pass
+                
+        return column_descriptions 
+            
+    def _prettyDescriptions(self, descriptions): # TODO include remaining columns
+        pretty = {}
+        if 'FORMAT' in descriptions:
+            for key,val in descriptions['FORMAT'].iteritems():
+                pretty[key] = val
+        if 'INFO' in descriptions:
+            for key,val in descriptions['INFO'].iteritems():
+                pretty[key + 'INFO'] = val
+        if 'FILTER' in descriptions:
+            filters = list(descriptions['FILTER'].iteritems())
+            max_width = max(len(x[0]) for x in filters)
+            pretty['FILTER'] = '\n'.join('%-*s %s' %(max_width, x[0] + ':', x[1]) for x in filters)
         
-        return descriptions
+        return pretty
 
 
 if __name__ == "__main__":
     reader = VariantFileReader()
+    testfile = "testfiles\\CSQ_test1.vcf"
+    vflist = reader.readVCFlike(testfile, sep="\t", chromCol="CHROM", posCol="POS", geneCol="", splitAsInfo="INFO", splitCsq=1, keep00=1)
+    
     testfile = "testfiles\\test_file.csv"
     vflist = reader.readVCFlike(testfile, sep=",", chromCol="CHROM", posCol="POS", geneCol="Gene", splitAsInfo="INFO", keep00=1)
     assert vflist[0].length == 425
