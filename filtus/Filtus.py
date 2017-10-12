@@ -460,7 +460,7 @@ class FiltusGUI(object):
     def pairwiseSharing(self):
         seleci = self.checkLoadedSamples(select="selection", minimum=2, VF=False)
         if seleci: FiltusAnalysis.pairwiseSharing(seleci, filtus=self)
-        
+    
     def browseFiles(self):
         longFileNameList = tkFileDialog.askopenfilenames(initialdir=self.currentFileDir, title="Load files")
         longFileNameList = list(self.parent.tk.splitlist(longFileNameList))
@@ -468,7 +468,7 @@ class FiltusGUI(object):
             longFileNameList = [os.path.normpath(p) for p in longFileNameList]
             self.currentFileDir = os.path.dirname(longFileNameList[0])
             self.loadFiles(longFileNameList)
-
+            
     def setSettings(self, result):
         if result != 'OK':
             self.settingsDialog.deactivate()

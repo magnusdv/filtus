@@ -187,11 +187,14 @@ class InputDialog(object):
         new_ext = self.currentfile is None or (os.path.splitext(filename)[1] != os.path.splitext(self.currentfile)[1])
         self.prompt = kwargs.pop('prompt', self.prompt or new_ext)
         self.guess = kwargs.pop('guess', self.guess or (self.prompt and new_ext))
+        promptShowsOk = None # modified when trying to show prompt
         
         try:
             self._guessAndPrepare(filename, kwargs)
             if self.prompt or any(OM.inconsistent for OM in self._activeMenus()):
+                promptShowsOk = False
                 FiltusUtils.activateInCenter(self.parent, self.dialog)
+                promptShowsOk = True
             else:
                 self._setParameters()
             if self.stopLoading or self.skipFile:
@@ -210,14 +213,17 @@ class InputDialog(object):
         except (ValueError, RuntimeError) as e:
             self.filtus.notbusy()
             FiltusUtils.warningMessage(e)
-            return self.read(filename, guess = False, prompt=True)
-        except Exception as e:
-            raise
-            self.filtus.notbusy()
-            typ = type(e).__name__
-            FiltusUtils.warningMessage("An error occured while reading this file:\n%s\n\n%s: %s\n\nPlease try again or skip file." %(filename, typ, e))
             return self.read(filename, guess=False, prompt=True)
-        
+        except Exception as e:
+            self.filtus.notbusy()
+            if promptShowsOk:
+                FiltusUtils.warningMessage("An error occured while reading this file:\n%s\n\n%s: %s\n\nPlease try again or skip file." %(filename, type(e).__name__, e))
+                return self.read(filename, guess=False, prompt=True)
+            else:
+                FiltusUtils.warningMessage("%s: %s\n\nSkipping this file: %s" %(type(e).__name__, e, filename))
+                self.skipFile = True
+                return
+                
         if self.checkHomozygosity and VF.noHomozygotes():
             tryagain = FiltusUtils.yesnoMessage('The file %s has no homozygous variants. Go back to settings dialog?'%filename)
             if tryagain:
@@ -279,15 +285,17 @@ class InputDialog(object):
                 genecCol = next((h for h, lowh in zip(headers, lowheaders) if 'gene' in lowh and 'name' in lowh), '')
             if geneCol: self.geneColMenu.setAndCheck(geneCol)
         
-        if self.guess:
-            vcf, infoCol, formatCol = self._guessVCF(self.originalHeaders, self.firstvariants[0])  # infoCol not used
-            self.vcfChooser.invoke(int(not vcf))
-            if vcf: self.splitFormatVar.set(1) # Default option: Split FORMAT
+        vcfGuess, formatColGuess = None, None
+        if self.guess and self.firstvariants:
+            vcfGuess, infoCol, formatColGuess = self._guessVCF(self.originalHeaders, self.firstvariants[0])  # infoCol not used
+            self.vcfChooser.invoke(int(not vcfGuess))
+            if vcfGuess: 
+                self.splitFormatVar.set(1) # Default option: Split FORMAT
             
         if 'formatCol' in kwargs: 
             self.formatColMenu.setAndCheck(kwargs['formatCol'])
-        elif self.guess: #from above
-            self.formatColMenu.setAndCheck(formatCol)
+        elif formatColGuess:
+            self.formatColMenu.setAndCheck(formatColGuess)
         
         if 'splitFormat' in kwargs: 
             self.splitFormatVar.set(kwargs['splitFormat'])
@@ -298,7 +306,7 @@ class InputDialog(object):
         
         if 'gtCol' in kwargs: self.gtColMenu.setAndCheck(kwargs['gtCol'])
         elif _doGuess('gtCol'):
-            gtCol = '' if vcf else _matchHeader(['genotype', 'gt', 'zygosity', 'homozygous', 'attribute_het'])
+            gtCol = '' if vcfGuess else _matchHeader(['genotype', 'gt', 'zygosity', 'homozygous', 'attribute_het'])
             self.gtColMenu.setAndCheck(gtCol)
         
         if 'split_general' in kwargs:
@@ -331,7 +339,10 @@ class InputDialog(object):
                 if len(firstlines) > n: 
                     break
         if not firstlines or not firstlines[0].strip():
-            raise IOError("Skipping empty file: %s" %filename)
+            headerline = ''
+            first = '' if n == 1 else []
+            return preamble, headerline, first
+            #raise RuntimeError("No variants found in file: %s" %filename)
         headerline = firstlines[0]
         if n==1:
             first = firstlines[1] if len(firstlines) > 1 else ''
@@ -353,9 +364,9 @@ class InputDialog(object):
         h = top.next()
         self.firstvariants = list(top)
         
-        if h[-1] == "Otherinfo": ### Annovar fix: Re-inserting VCF column names.
+        if h and h[-1] == "Otherinfo": ### Annovar fix: Re-inserting VCF column names.
             h[:] = self.reader._fixAnnovarOtherinfo(h, self.firstvariants[0])
-        if h[0] == '#CHROM': ### VCF tweak
+        if h and h[0] == '#CHROM': ### VCF tweak
             h[0] = 'CHROM'
         
         self.originalHeaders = h
@@ -508,7 +519,7 @@ class InputDialog(object):
             
     def _setParameters(self):
         if self.sepInputOM.inconsistent:
-            raise RuntimeError('Column separator not found in first line.\n\nPlease check the input settings (including "Skip lines starting with")')
+            raise RuntimeError('Column separator not found in first line.\n\nPlease revise the input settings.')
         wrongcols = [OM.getvalue() for OM in self._activeMenus() if OM.inconsistent and OM not in (self.splitcol1Menu, self.splitcol2Menu)]
         if wrongcols: 
             raise RuntimeError("Column(s) not found in file: %s" %', '.join(wrongcols))
