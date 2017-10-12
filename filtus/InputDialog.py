@@ -277,7 +277,12 @@ class InputDialog(object):
                 self.hasCSQ = True
                 self._CSQheaders = line.split("Format: ")[1].strip().strip('">').split("|")
                 break
-                
+        if not self.hasCSQ:
+            self.splitCsqVar.set(0)
+            self.splitCsqButt.configure(state="disabled")
+        else:
+            self._splitINFO_update()
+            
         if 'geneCol' in kwargs: self.geneColMenu.setAndCheck(kwargs['geneCol'])
         elif _doGuess('geneCol'):
             geneCol = _matchHeader(['gene', 'gene.refgene', 'gene symbol'])
