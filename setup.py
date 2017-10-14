@@ -7,7 +7,7 @@ except ImportError:
 
 config = {
     'name': 'filtus',
-    'version': "1.0.4",
+    'version': "1.0.5",
     'description': 'Analysis of exome variant files',
     'long_description': open('README.md').read(),
     'author': 'Magnus Dehli Vigeland',

@@ -2,6 +2,17 @@
     FILTUS Changelog
 =========================
 
+Version 1.0.5. Date 14.10.2017
+--------------------------------
+
+NEW FEATURES:
+* Relevant for variant files annotated by VEP: If the INFO field contains a CSQ field, Filtus now offers to split this intelligently, using the format indicated in the preamble of the file. To activate this feature, first indicate "Split as INFO" in the input dialog, and then check "and split CSQ". If consequences for several transcripts/alleles are included for a variant, only the first is used. It is therefore recommended to run VEP with the "--pick" option, which selects only one consequence.
+
+BUG FIXES:
+* Better error handling of malformed variant files. 
+
+* Fixed bug causing Filtus to crash when trying to run PLINK homozygosity without PLINK being installed.
+
 Version 1.0.4. Date 14.02.2016
 --------------------------------
 
