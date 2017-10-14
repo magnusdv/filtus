@@ -29,7 +29,8 @@ class VariantFileReader(object):
         if splitAsInfo or split_general: # this is allowed also in nonVCF files
             if splitAsInfo:
                 infoInd = headers.index(splitAsInfo)
-                headers[:], variants[:] = self._splitINFO(headers, variants, infoInd)
+                headers[:], variants[:] = self._splitINFO_slow(headers, variants, infoInd)
+                
             for col, sep in split_general:  
                 headers[:], variants[:] = self._splitGeneral(headers, variants, col, sep)        
             variants[:] = map(tuple, variants)    
@@ -57,7 +58,7 @@ class VariantFileReader(object):
             if prefilter is not None: 
                 ifile = self._applyPrefilter(ifile, prefilter)
             data = [row for row in csv.reader(ifile, delimiter = sep, skipinitialspace = False, strict=True)] # saving time (?) with skip.. = False
-        #descriptions = self._parseDescriptions(preambleLines)
+        
         colDescriptions = self._parseColumnDescriptions(preambleLines)
         descriptions = self._prettyDescriptions(colDescriptions)
         

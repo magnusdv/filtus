@@ -202,10 +202,11 @@ class InputDialog(object):
             
             self.filtus.busy()
             common_params = dict(filename=filename, sep=self.sep, chromCol=self.chromCol, posCol=self.posCol, geneCol=self.geneCol, 
-                                splitAsInfo=self.infoCol, splitCsq=self.splitCsq, split_general=self.split_general, prefilter=self.prefilter)
+                                splitAsInfo=self.infoCol, split_general=self.split_general, prefilter=self.prefilter)
             
+            # Note: splitAsInfo works also for nonVCF, but not splitCSQ (which requires correct preamble data)
             if self.vcf:
-                VF = self.reader.readVCFlike(formatCol=self.formatCol, splitFormat=self.splitFormat, keep00=self.keep00, **common_params)
+                VF = self.reader.readVCFlike(formatCol=self.formatCol, splitFormat=self.splitFormat, splitCsq=self.splitCsq, keep00=self.keep00, **common_params)
             else:
                 VF = self.reader.readNonVCF(skiplines=self.skiplines, gtCol=self.gtCol, homSymbol=self.homSymbol, **common_params)
             self.filtus.notbusy()
