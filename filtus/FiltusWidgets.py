@@ -2130,11 +2130,12 @@ class PLINK_GUI(Pmw.Dialog):
                 
     #### Private methods ###
     def _cleanup(self, dir, pedprefix, outprefix):
-        if not dir: dir = os.getcwd()
+        if not dir: 
+            dir = os.getcwd()
         pedfiles = [pedprefix + '.ped', pedprefix + '.map']
         for f in os.listdir(dir):
             if f.startswith(outprefix) or f in pedfiles:
-                os.remove(f)
+                os.remove(os.path.join(dir,f))
     
     def _prepare(self):
         self.VF = VF = self.filtus.checkLoadedSamples(select="selection", VF=True, minimum=1, maximum=1)[0]
